@@ -1,0 +1,23 @@
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[workspace]
+resolver = "3"
+members = [
+  "crates/bcr-wdc-eic-service",
+  "crates/bcr-wdc-ens-service",
+]
+
+[workspace.dependencies]
+anyhow = {version = "1"}
+async-trait = {version = "0.1"}
+axum = {version = "0.8"}
+config = {version = "0.15"}
+serde = {version = "1", features = ["derive"]}
+serde_json = {version = "1"}
+tokio = {version = "1"}
+tracing = {version = "0.1"}
+tracing-log = {version = "0.2"}
+tracing-subscriber = {version = "0.3"}

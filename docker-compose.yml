@@ -1,0 +1,19 @@
+services:
+  eic-service:
+    extends:
+      file: common-services.yml
+      service: eic-service
+    ports:
+      - "8090:3338"
+  ens-service:
+    extends:
+      file: common-services.yml
+      service: ens-service
+    ports:
+      - "8091:3338"
+  surrealdb:
+    extends:
+      file: common-services.yml
+      service: surrealdb
+    ports:
+      - "8000:8000"
