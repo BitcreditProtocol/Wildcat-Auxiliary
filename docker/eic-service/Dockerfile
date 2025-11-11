@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.19.0
 ARG WILDCAT_BASE_IMAGE=wildcat-auxiliary/base-image
 FROM ${WILDCAT_BASE_IMAGE} AS rust-builder
 

@@ -1,5 +1,5 @@
-ARG WILDCAT_BASE_IMAGE=wildcat-auxiliary/base-image
-FROM ${WILDCAT_BASE_IMAGE} AS rust-builder
+# syntax=docker/dockerfile:1
+FROM base AS rust-builder
 
 ##############################
 ## Create image
