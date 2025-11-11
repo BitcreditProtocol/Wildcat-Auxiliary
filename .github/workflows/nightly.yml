@@ -62,7 +62,9 @@ jobs:
         context: .
         file: docker/base-image/Dockerfile
         platforms: linux/amd64
-        tags: ${{ env.BASE_IMAGE_NAME }}
+        tags: |
+          ${{ env.BASE_IMAGE_NAME }}
+          ${{ env.BASE_IMAGE_NAME }}:latest
         push: false
         outputs: type=docker,dest=${{ env.BASE_TAR }},name=${{ env.BASE_IMAGE_NAME }}
         cache-from: |
