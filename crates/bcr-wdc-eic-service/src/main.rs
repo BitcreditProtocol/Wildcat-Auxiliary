@@ -1,6 +1,6 @@
+use secp256k1::SecretKey;
 use std::env;
 use std::str::FromStr;
-
 use tokio::signal;
 use tracing::info;
 use tracing_subscriber::{filter::LevelFilter, prelude::*};
@@ -12,14 +12,17 @@ struct MainConfig {
     log_level: String,
 }
 
+#[derive(Debug, serde::Deserialize)]
+struct SeedConfig {
+    mnemonic: bip39::Mnemonic,
+}
+
 #[tokio::main]
 async fn main() {
     let cfg_path = env::var("EIC_CONFIG_FILE").unwrap_or_else(|_| "config.toml".to_string());
     let settings = config::Config::builder()
         .add_source(config::File::with_name(&cfg_path))
-        .add_source(
-            config::Environment::with_prefix("EBILL_IDENTITY_CONFIRMATION_SERVICE").separator("__"),
-        )
+        .add_source(config::Environment::with_prefix("EIC").separator("__"))
         .build()
         .expect("Failed to build eic config");
 
@@ -27,21 +30,37 @@ async fn main() {
         .try_deserialize()
         .expect("Failed to parse eic config");
 
+    // seed is acquired from environment variables
+    let settings = config::Config::builder()
+        .add_source(config::Environment::with_prefix("EIC"))
+        .build()
+        .expect("Failed to build seed config");
+    let seedcfg: SeedConfig = settings
+        .try_deserialize()
+        .expect("Failed to parse seed config");
+    let seed = seedcfg.mnemonic.to_seed("eBill-identity-confirmation");
+    let (key, _) = seed.split_at(32);
+    let secret_key = SecretKey::from_slice(key).expect("can create key from seed");
+
     tracing_log::LogTracer::init().expect("LogTracer init");
     let level_filter = LevelFilter::from_str(&maincfg.log_level).expect("log level");
     let stdout_log = tracing_subscriber::fmt::layer().with_filter(level_filter);
     let subscriber = tracing_subscriber::registry().with(stdout_log);
     tracing::subscriber::set_global_default(subscriber)
         .expect("tracing::subscriber::set_global_default");
+    let network = maincfg.appcfg.bitcoin_network;
 
-    let app = bcr_wdc_eic_service::AppController::new(maincfg.appcfg).await;
+    let app = bcr_wdc_eic_service::AppController::new(&secret_key, maincfg.appcfg).await;
     let router = bcr_wdc_eic_service::routes(app);
 
     let listener = tokio::net::TcpListener::bind(&maincfg.bind_address)
         .await
         .expect("Failed to bind to address");
 
-    info!("Listening on {}", &maincfg.bind_address);
+    info!(
+        "Listening on {}, network: {}",
+        &maincfg.bind_address, &network
+    );
     axum::serve(listener, router)
         .with_graceful_shutdown(shutdown_signal())
         .await

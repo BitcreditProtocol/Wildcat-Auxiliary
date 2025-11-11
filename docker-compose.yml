@@ -10,7 +10,7 @@ services:
       file: common-services.yml
       service: ens-service
     ports:
-      - "8091:3338"
+      - "8091:3339"
   surrealdb:
     extends:
       file: common-services.yml
