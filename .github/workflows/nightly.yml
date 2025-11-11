@@ -3,8 +3,8 @@ name: build and push nightly images
 on:
   push:
     branches:
-      #- master
-      - "**" # testing
+      - master
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -73,16 +73,13 @@ jobs:
           type=registry,ref=${{ env.GAR_PATH }}/${{ env.BASE_IMAGE_NAME }}:buildcache,mode=max
           type=gha,mode=max,scope=${{ github.repository }}/${{ env.BASE_IMAGE_NAME }}
 
-
     - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
       with:
         name: base-image
         path: "${{ env.BASE_TAR }}"
         retention-days: 1
 
-# ───────────────────────────────
-# build & push wildcat auxiliary images
-# ───────────────────────────────
+
   wildcat-aux-images:
     needs: base-image
     runs-on: ubuntu-latest
@@ -132,7 +129,6 @@ jobs:
       uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
       with:
         driver: docker
-        
 
     - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
       with:
