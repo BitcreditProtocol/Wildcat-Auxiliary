@@ -1,0 +1,46 @@
+services:
+  eic-service:
+    image: wildcat/eic-service
+    pull_policy: never
+    depends_on:
+      surrealdb:
+        condition: service_healthy
+    volumes:
+      - ./docker/eic-service/config.toml:/eic-service/config.toml
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:3338/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+      start_interval: 3s
+
+  ens-service:
+    image: wildcat/ens-service
+    pull_policy: never
+    depends_on:
+      surrealdb:
+        condition: service_healthy
+    volumes:
+      - ./docker/ens-service/config.toml:/ens-service/config.toml
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:3338/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+      start_interval: 3s
+
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    volumes:
+      - ./.docker_data/surrealdb:/data
+    command:
+      - start
+      - --unauthenticated
+      - rocksdb:/data/database.db
+    user: ${UID}:${GID}
+    healthcheck:
+      test: [ "CMD", "/surreal", "is-ready" ]
+      interval: 5s
+      retries: 5

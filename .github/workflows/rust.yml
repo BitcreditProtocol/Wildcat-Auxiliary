@@ -1,0 +1,90 @@
+name: Rust CI
+
+on:
+  push:
+    branches: [ "**" ]
+
+env:
+  CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain:
+          - stable
+    steps:
+      - name: Free up disk space
+        run: |
+          echo "Before cleanup:"
+          df -h
+          docker system prune -a -f
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo apt-get clean
+          sudo apt-get autoremove -y
+          echo "After cleanup:"
+          df -h
+
+      - name: Create GitHub app token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.PRIVATE_REPO_ACCESS_APP_ID }}
+          private-key: ${{ secrets.PRIVATE_REPO_ACCESS_APP_PRIVATE_KEY }}
+          owner: BitcreditProtocol
+      
+      - name: Git auth with app token
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Install protoc
+        run: sudo apt-get install -y protobuf-compiler
+
+      - name: install rust
+        run: rustup update stable
+
+      - name: Add rustup components
+        run: rustup component add clippy rustfmt
+
+      - name: Activate cache
+        uses: Swatinem/rust-cache@v2.8.0
+        with:
+          prefix-key: "wildcat-auxiliary-01"
+
+      - name: Install required cargo tools
+        run: cargo install cargo-deny clippy-sarif sarif-fmt
+
+      - name: Check
+        run: cargo check
+
+      - name: Check formatting
+        run: cargo fmt -- --check
+
+      - name: Clippy
+        run:
+          cargo clippy
+          --all-features
+          --message-format=json | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
+        continue-on-error: true
+
+      - name: Cargo deny 
+        run: cargo deny check
+        continue-on-error: true
+
+      - name: Upload analysis results to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: rust-clippy-results.sarif
+          wait-for-processing: true
+
