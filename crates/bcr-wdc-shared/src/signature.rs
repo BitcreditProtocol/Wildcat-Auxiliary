@@ -22,7 +22,6 @@ pub fn verify_request(
 ) -> Result<bool, anyhow::Error> {
     let hash = sha256::Hash::hash(payload);
     let msg = Message::from_digest(*hash.as_ref());
-
     Ok(SECP256K1.verify_schnorr(signature, &msg, key).is_ok())
 }
 
@@ -37,7 +36,7 @@ pub fn sign_payload(req: &[u8], private_key: &SecretKey) -> Signature {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::wire::EmailConfirmPayload;
+    use crate::wire::{EmailConfirmPayload, NotificationSendPayload};
 
     use super::*;
     use bcr_common::core::NodeId;
@@ -61,7 +60,7 @@ pub mod tests {
         let x_only_pub = secret_key.public_key(SECP256K1).x_only_public_key().0;
 
         // let challenge = Challenge::new();
-        let challenge = String::from("BdDrphMNQjg3q18fuFkktYARB1meR6gNcjzAmt4aTAWH");
+        let challenge = String::from("Ca2b5JS3pVQQANSYq4NCcZfkdxN7bM7gFQqWvRTiiLp8");
         let sig = signature(&base58::decode(&challenge).unwrap(), &secret_key);
         // print to be able to manually create requests with -- --nocapture
         println!(
@@ -93,6 +92,33 @@ pub mod tests {
         // print to be able to manually create requests with -- --nocapture
         println!("req payload: {payload}");
         println!("req sig: {sig}");
+        let verified = verify_request(&serialized, &sig, &x_only_pub);
+        assert!(verified.is_ok());
+        assert!(verified.as_ref().unwrap());
+    }
+
+    #[test]
+    fn sig_req_send_test() {
+        let secret_key =
+            SecretKey::from_str("8863c82829480536893fc49c4b30e244f97261e989433373d73c648c1a656a79")
+                .unwrap();
+        let x_only_pub = secret_key.public_key(SECP256K1).x_only_public_key().0;
+        let node_id = NodeId::new(secret_key.public_key(SECP256K1), bitcoin::Network::Testnet);
+
+        let req = NotificationSendPayload {
+            kind: "BillAccepted".to_string(),
+            id: "bitcrtB7nSVpa37KKGZvcz1Qz7TRRC3MvLp38FMJXbXiGaUQYt".to_string(),
+            sender_node_id: node_id.clone(),
+            receiver_node_id: node_id.clone(),
+            receiver_company_node_id: None,
+        };
+        let serialized = borsh::to_vec(&req).unwrap();
+        let payload = base58::encode(&serialized);
+
+        let sig = sign_payload(&serialized, &secret_key);
+        // print to be able to manually create requests with -- --nocapture
+        println!("req send payload: {payload}");
+        println!("req send sig: {sig}");
         let verified = verify_request(&serialized, &sig, &x_only_pub);
         assert!(verified.is_ok());
         assert!(verified.as_ref().unwrap());

@@ -46,3 +46,14 @@ services:
       test: [ "CMD", "/surreal", "is-ready" ]
       interval: 5s
       retries: 5
+
+  rproxy:
+    image: nginx:stable-bookworm
+    depends_on:
+      eic-service:
+        condition: service_healthy
+      ens-service:
+        condition: service_healthy
+    volumes:
+      - ./docker/rproxy/nginx.conf:/etc/nginx/nginx.conf
+    restart: unless-stopped

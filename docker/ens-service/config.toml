@@ -2,6 +2,8 @@ bind_address = "0.0.0.0:3339"
 log_level = "DEBUG"
 
 [appcfg]
+host_url = "http://localhost:4444" # the domain where the service is reachable
+app_url = "http://localhost:8081" # the domain where the ebill app is hosted for this env
 
 [appcfg.email_notification_preferences]
 connection = "ws://surrealdb:8000"

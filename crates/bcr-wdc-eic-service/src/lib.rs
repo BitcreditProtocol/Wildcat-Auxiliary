@@ -69,7 +69,9 @@ impl AppController {
 
 pub fn routes(app: AppController) -> Router {
     let web = Router::new()
+        // health
         .route("/health", get(web::health))
+        // external API endpoints
         .route("/v1/email/register", post(web::email_register))
         .route("/v1/email/confirm", post(web::email_confirm))
         .route("/v1/challenge", post(web::challenge));

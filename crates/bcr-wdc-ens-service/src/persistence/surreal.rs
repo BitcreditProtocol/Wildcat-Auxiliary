@@ -55,8 +55,9 @@ pub struct EmailNotificationPreferencesDBEntry {
     pub node_id: NodeId,
     pub company_node_id: Option<NodeId>,
     pub email: EmailAddress,
+    pub enabled: bool,
     pub preferences: i64,
-    pub token: Uuid,
+    pub pref_token: Uuid,
     pub created_at: TStamp,
 }
 
@@ -66,8 +67,9 @@ impl From<EmailNotificationPreferencesDBEntry> for EmailNotificationPreferences 
             node_id: value.node_id,
             company_node_id: value.company_node_id,
             email: value.email,
+            enabled: value.enabled,
             preferences: PreferencesFlags::from_bits_truncate(value.preferences),
-            token: value.token,
+            pref_token: value.pref_token,
         }
     }
 }
@@ -130,15 +132,17 @@ impl EmailNotificationPreferencesRepository for DBEmailNotificationPreferences {
         node_id: &NodeId,
         company_node_id: &Option<NodeId>,
         email: &EmailAddress,
+        enabled: bool,
         preferences: PreferencesFlags,
-        token: &Uuid,
+        pref_token: &Uuid,
     ) -> Result<()> {
         let entry = EmailNotificationPreferencesDBEntry {
             node_id: node_id.to_owned(),
             company_node_id: company_node_id.to_owned(),
             email: email.to_owned(),
+            enabled,
             preferences: preferences.bits(),
-            token: token.to_owned(),
+            pref_token: pref_token.to_owned(),
             created_at: now(),
         };
         let id = DBEmailNotificationPreferences::id(node_id, company_node_id);
@@ -148,6 +152,46 @@ impl EmailNotificationPreferencesRepository for DBEmailNotificationPreferences {
             .upsert((&self.table, id))
             .content(entry)
             .await
+            .map_err(|e| Error::EmailNotificationPreferencesRepository(anyhow!(e)))?;
+
+        Ok(())
+    }
+
+    async fn get_preferences_for_token(
+        &self,
+        pref_token: &Uuid,
+    ) -> Result<Option<EmailNotificationPreferences>> {
+        let table = self.table.clone();
+        let res: Option<EmailNotificationPreferencesDBEntry> = self
+            .db
+            .query("SELECT * FROM type::table($table) WHERE pref_token = $pref_token")
+            .bind(("table", table))
+            .bind(("pref_token", pref_token.to_owned()))
+            .await
+            .map_err(|e| Error::EmailNotificationPreferencesRepository(anyhow!(e)))?
+            .take(0)
+            .map_err(|e| Error::EmailNotificationPreferencesRepository(anyhow!(e)))?;
+
+        Ok(res.map(|r| r.clone().into()))
+    }
+
+    async fn update_prefences_for_token(
+        &self,
+        pref_token: &Uuid,
+        enabled: bool,
+        preferences: PreferencesFlags,
+    ) -> Result<()> {
+        let table = self.table.clone();
+        let _res: Option<EmailNotificationPreferencesDBEntry> = self
+            .db
+            .query("UPDATE type::table($table) SET enabled = $enabled, preferences = $preferences WHERE pref_token = $pref_token")
+            .bind(("table", table))
+            .bind(("pref_token", pref_token.to_owned()))
+            .bind(("enabled", enabled))
+            .bind(("preferences", preferences.bits()))
+            .await
+            .map_err(|e| Error::EmailNotificationPreferencesRepository(anyhow!(e)))?
+            .take(0)
             .map_err(|e| Error::EmailNotificationPreferencesRepository(anyhow!(e)))?;
 
         Ok(())

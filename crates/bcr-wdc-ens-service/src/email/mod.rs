@@ -6,23 +6,29 @@ use tinytemplate::TinyTemplate;
 mod template;
 
 #[derive(Serialize)]
-struct EmailConfirmationContext {
+struct NotificationContext {
     pub logo_link: url::Url,
-    pub confirmation_code: String,
+    pub title: String,
+    pub link: url::Url,
+    pub preferences_link: url::Url,
 }
 
-pub fn build_email_confirmation_message(
+pub fn build_email_notification_message(
     logo_url: &url::Url,
     from: &EmailAddress,
     to: &EmailAddress,
-    confirmation_code: &str,
+    title: &str,
+    link: &url::Url,
+    preferences_link: &url::Url,
 ) -> Result<EmailMessage, anyhow::Error> {
     let mut tt = TinyTemplate::new();
-    tt.add_template("mail", template::MAIL_CONFIRMATION_TEMPLATE)?;
+    tt.add_template("mail", template::NOTIFICATION_MAIL_TEMPLATE)?;
 
-    let context = EmailConfirmationContext {
+    let context = NotificationContext {
         logo_link: logo_url.to_owned(),
-        confirmation_code: confirmation_code.to_string(),
+        title: title.to_owned(),
+        link: link.to_owned(),
+        preferences_link: preferences_link.to_owned(),
     };
 
     let rendered = tt.render("mail", &context)?;
@@ -30,7 +36,7 @@ pub fn build_email_confirmation_message(
     Ok(EmailMessage {
         from: from.to_owned(),
         to: to.to_owned(),
-        subject: "Please confirm your E-Mail".to_owned(),
+        subject: title.to_owned(),
         body: rendered,
     })
 }

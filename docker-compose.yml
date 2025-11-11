@@ -3,17 +3,17 @@ services:
     extends:
       file: common-services.yml
       service: eic-service
-    ports:
-      - "8090:3338"
   ens-service:
     extends:
       file: common-services.yml
       service: ens-service
-    ports:
-      - "8091:3339"
   surrealdb:
     extends:
       file: common-services.yml
       service: surrealdb
+  rproxy:
+    extends:
+        file: common-services.yml
+        service: rproxy
     ports:
-      - "8000:8000"
+      - "4444:4242"

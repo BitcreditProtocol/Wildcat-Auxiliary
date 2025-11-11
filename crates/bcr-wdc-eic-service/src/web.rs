@@ -17,7 +17,7 @@ pub async fn health() -> &'static str {
     "{ \"status\": \"OK\" }"
 }
 
-#[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl))]
+#[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl, req))]
 pub async fn challenge(
     State(ctrl): State<Arc<Service>>,
     Json(req): Json<ChallengeRequest>,
@@ -29,22 +29,20 @@ pub async fn challenge(
     }))
 }
 
-#[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl))]
+#[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl, req))]
 pub async fn email_register(
     State(ctrl): State<Arc<Service>>,
     Json(req): Json<EmailRegisterRequest>,
 ) -> Result<Json<EmailRegisterResponse>> {
-    ctrl.register_email_for_node_id(
-        &req.node_id,
-        &req.company_node_id,
-        &req.email,
-        &req.signed_challenge,
-    )
-    .await?;
+    ctrl.check_challenge(&req.node_id, &req.signed_challenge)
+        .await?;
+
+    ctrl.register_email_for_node_id(&req.node_id, &req.company_node_id, &req.email)
+        .await?;
     Ok(Json(EmailRegisterResponse { success: true }))
 }
 
-#[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl))]
+#[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl, req))]
 pub async fn email_confirm(
     State(ctrl): State<Arc<Service>>,
     Json(req): Json<EmailConfirmRequest>,
