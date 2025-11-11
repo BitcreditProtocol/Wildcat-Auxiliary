@@ -1,4 +1,4 @@
-ARG WILDCAT_BASE_IMAGE=wildcat/base-image
+ARG WILDCAT_BASE_IMAGE=wildcat-auxiliary/base-image
 FROM ${WILDCAT_BASE_IMAGE} AS rust-builder
 
 ##############################
