@@ -24,7 +24,7 @@ run-ens-service:
 
 # to build docker containers
 build-docker-base-image:
-    docker build --ssh default -t wildcat/base-image -f docker/base-image/Dockerfile .
+    docker build --ssh default -t wildcat-auxiliary/base-image -f docker/base-image/Dockerfile .
 
 build-docker-eic-service: build-docker-base-image
     docker build -t wildcat/eic-service -f docker/eic-service/Dockerfile .
