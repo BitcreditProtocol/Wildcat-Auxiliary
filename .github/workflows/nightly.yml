@@ -3,7 +3,8 @@ name: build and push nightly images
 on:
   push:
     branches:
-      - master
+      #- master
+      - "**"  # testing
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -63,9 +64,9 @@ jobs:
         file: docker/base-image/Dockerfile
         platforms: linux/amd64
         tags: |
-          ${{ env.BASE_IMAGE_NAME }}:latest
+          ${{ env.BASE_IMAGE_NAME }}
         push: false
-        outputs: type=docker,dest=${{ env.BASE_TAR }},name=${{ env.BASE_IMAGE_NAME }}:latest
+        outputs: type=docker,dest=${{ env.BASE_TAR }},name=${{ env.BASE_IMAGE_NAME }}
         cache-from: |
           type=registry,ref=${{ env.GAR_PATH }}/${{ env.BASE_IMAGE_NAME }}:buildcache
           type=gha,scope=${{ github.repository }}/${{ env.BASE_IMAGE_NAME }}
@@ -94,9 +95,9 @@ jobs:
       matrix:
         service:
           - name: bcr-wdc-eic-service
-            dockerfile: docker/eic-service/Dockerfile.buildkit
+            dockerfile: docker/eic-service/Dockerfile
           - name: bcr-wdc-ens-service
-            dockerfile: docker/ens-service/Dockerfile.buildkit
+            dockerfile: docker/ens-service/Dockerfile
 
     steps:
     - name: Checkout code
