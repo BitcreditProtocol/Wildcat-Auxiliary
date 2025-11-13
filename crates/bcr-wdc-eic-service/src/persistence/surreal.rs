@@ -156,7 +156,7 @@ impl EmailConfirmationRepository for DBEmails {
 
         let _res: Option<EmailConfirmationDBEntry> = self
             .db
-            .insert((&self.table_confirmations, id))
+            .upsert((&self.table_confirmations, id))
             .content(entry)
             .await
             .map_err(|e| Error::EmailRepository(anyhow!(e)))?;

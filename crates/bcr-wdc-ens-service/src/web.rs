@@ -7,6 +7,7 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Redirect};
 use axum::{Json, extract::State};
 use axum_extra::extract::Form;
+use bcr_wdc_shared::rate_limit::RateLimiter;
 use bcr_wdc_shared::{
     signature::verify_request,
     wire::{
@@ -17,7 +18,8 @@ use bcr_wdc_shared::{
 };
 use bitcoin::base58;
 use std::sync::Arc;
-use tracing::error;
+use tokio::sync::Mutex;
+use tracing::{error, warn};
 use uuid::Uuid;
 
 pub async fn health() -> &'static str {
@@ -49,6 +51,7 @@ pub async fn set_email_preferences(
 #[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl, req))]
 pub async fn send_email(
     State(ctrl): State<Arc<Service>>,
+    State(rl): State<Arc<Mutex<RateLimiter>>>,
     Json(req): Json<NotificationSendRequest>,
 ) -> Result<Json<NotificationSendResponse>> {
     let decoded = base58::decode(&req.payload)
@@ -64,6 +67,21 @@ pub async fn send_email(
     ) else {
         return Err(Error::SignedRequest("Invalid Signature".into()));
     };
+
+    let mut rate_limiter = rl.lock().await;
+    let allowed = rate_limiter.check(
+        None,
+        Some(&deserialized.sender_node_id),
+        Some(&deserialized.receiver_node_id),
+    );
+    drop(rate_limiter);
+    if !allowed {
+        warn!(
+            "Rate limited req with sender node_id {}, receiver node id {}",
+            &deserialized.sender_node_id, &deserialized.receiver_node_id
+        );
+        return Err(Error::RateLimit);
+    }
 
     ctrl.send_email(
         &deserialized.receiver_node_id,

@@ -3,8 +3,12 @@ use axum::{
     extract::FromRef,
     routing::{get, post},
 };
-use bcr_wdc_shared::email::mailjet::{MailJetConfig, MailjetClient};
+use bcr_wdc_shared::{
+    email::mailjet::{MailJetConfig, MailjetClient},
+    rate_limit::RateLimiter,
+};
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 mod email;
 mod email_preferences;
@@ -31,6 +35,7 @@ pub struct AppConfig {
 #[derive(Clone, FromRef)]
 pub struct AppController {
     srvc: Arc<ProdService>,
+    rate_limiter: Arc<Mutex<RateLimiter>>,
 }
 
 impl AppController {
@@ -52,7 +57,10 @@ impl AppController {
             cfg_clone,
         ));
 
-        Self { srvc }
+        Self {
+            srvc,
+            rate_limiter: Arc::new(Mutex::new(RateLimiter::new())),
+        }
     }
 }
 

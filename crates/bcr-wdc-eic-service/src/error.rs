@@ -25,6 +25,8 @@ pub enum Error {
     EmailClient(AnyError),
     #[error("SignedRequest error {0}")]
     SignedRequest(String),
+    #[error("RateLimit error")]
+    RateLimit,
 }
 
 impl axum::response::IntoResponse for Error {
@@ -40,6 +42,10 @@ impl axum::response::IntoResponse for Error {
             Error::Signature(_) => (StatusCode::INTERNAL_SERVER_ERROR, String::new()),
             Error::Confirmation(e) => (StatusCode::BAD_REQUEST, e),
             Error::SignedRequest(e) => (StatusCode::BAD_REQUEST, e),
+            Error::RateLimit => (
+                StatusCode::TOO_MANY_REQUESTS,
+                String::from("Please try again later"),
+            ),
         };
         resp.into_response()
     }
