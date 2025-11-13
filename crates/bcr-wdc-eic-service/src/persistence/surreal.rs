@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use bcr_common::core::NodeId;
 use bcr_wdc_shared::{TStamp, challenge::persistence::ChallengeRepository, now};
 use email_address::EmailAddress;
+use secp256k1::schnorr::Signature;
 use surrealdb::{Result as SurrealResult, Surreal, engine::any::Any};
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
@@ -97,7 +98,7 @@ pub struct EmailRegistrationDBEntry {
     pub node_id: NodeId,
     pub company_node_id: Option<NodeId>,
     pub email: EmailAddress,
-    pub mint_signature: String,
+    pub mint_signature: Signature,
     pub created_at: TStamp,
 }
 
@@ -214,7 +215,7 @@ impl EmailConfirmationRepository for DBEmails {
         node_id: &NodeId,
         company_node_id: &Option<NodeId>,
         email: &EmailAddress,
-        mint_signature: &str,
+        mint_signature: &Signature,
     ) -> Result<()> {
         let entry = EmailRegistrationDBEntry {
             node_id: node_id.to_owned(),

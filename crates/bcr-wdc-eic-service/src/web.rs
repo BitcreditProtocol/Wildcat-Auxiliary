@@ -25,7 +25,7 @@ pub async fn challenge(
     let challenge = ctrl.create_challenge_for_node_id(&req.node_id).await?;
     Ok(Json(ChallengeResponse {
         challenge: challenge.to_string(),
-        ttl: challenge.ttl(),
+        ttl: challenge.ttl().num_seconds() as u64,
     }))
 }
 

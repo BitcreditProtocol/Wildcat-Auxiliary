@@ -14,17 +14,7 @@ pub struct EnsRestConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct EnsRestClient(Client);
-
-impl EnsRestClient {
-    pub fn new(cfg: EnsRestConfig) -> Self {
-        let cl = Client::new(cfg.base_url);
-        Self(cl)
-    }
-}
-
-#[derive(Debug, Clone)]
-struct Client {
+pub struct Client {
     cl: reqwest::Client,
     base: reqwest::Url,
 }
@@ -39,7 +29,7 @@ impl Client {
 }
 
 #[async_trait]
-impl EnsClient for EnsRestClient {
+impl EnsClient for Client {
     async fn set_email_preferences(
         &self,
         node_id: &NodeId,
@@ -60,13 +50,11 @@ impl EnsClient for EnsRestClient {
         };
 
         let url = self
-            .0
             .base
             .join("/v1/email/preferences")
             .expect("set email preferences path");
 
         let res = self
-            .0
             .cl
             .post(url)
             .json(&payload)

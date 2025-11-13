@@ -6,7 +6,7 @@ mod template;
 
 #[derive(Serialize)]
 struct EmailConfirmationContext {
-    pub logo_link: String,
+    pub logo_link: url::Url,
     pub confirmation_code: String,
 }
 
@@ -20,7 +20,7 @@ pub fn build_email_confirmation_message(
     tt.add_template("mail", template::MAIL_CONFIRMATION_TEMPLATE)?;
 
     let context = EmailConfirmationContext {
-        logo_link: logo_url.to_string(),
+        logo_link: logo_url.to_owned(),
         confirmation_code: confirmation_code.to_string(),
     };
 

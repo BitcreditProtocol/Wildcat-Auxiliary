@@ -12,9 +12,8 @@ use bcr_wdc_shared::{
     now, signature,
     wire::MintSignature,
 };
-use chrono::TimeDelta;
 use email_address::EmailAddress;
-use secp256k1::SecretKey;
+use secp256k1::{SecretKey, schnorr::Signature};
 use std::sync::Arc;
 use tracing::warn;
 
@@ -61,7 +60,7 @@ pub trait EmailConfirmationRepository: Send + Sync {
         node_id: &NodeId,
         company_node_id: &Option<NodeId>,
         email: &EmailAddress,
-        mint_signature: &str,
+        mint_signature: &Signature,
     ) -> Result<()>;
 }
 
@@ -110,7 +109,7 @@ impl Service {
         node_id: &NodeId,
         company_node_id: &Option<NodeId>,
         email: &EmailAddress,
-        signed_challenge: &str,
+        signed_challenge: &Signature,
     ) -> Result<()> {
         self.check_challenge(node_id, signed_challenge).await?;
 
@@ -149,7 +148,7 @@ impl Service {
         node_id: &NodeId,
         company_node_id: &Option<NodeId>,
         confirmation_code: &str,
-    ) -> Result<(MintSignature, String, NodeId)> {
+    ) -> Result<(MintSignature, Signature, NodeId)> {
         // get confirmation email state
         let Some(confirmation) = self
             .email_confirmation_repo
@@ -233,7 +232,7 @@ impl Service {
         node_id: &NodeId,
         company_node_id: &Option<NodeId>,
         email: &EmailAddress,
-    ) -> Result<(MintSignature, String)> {
+    ) -> Result<(MintSignature, Signature)> {
         let sig_payload = MintSignature {
             node_id: node_id.to_owned(),
             company_node_id: company_node_id.to_owned(),
@@ -245,7 +244,11 @@ impl Service {
         Ok((sig_payload, signature))
     }
 
-    async fn check_challenge(&self, node_id: &NodeId, signed_challenge: &str) -> Result<bool> {
+    async fn check_challenge(
+        &self,
+        node_id: &NodeId,
+        signed_challenge: &Signature,
+    ) -> Result<bool> {
         // check if challenge exists
         let Some((challenge, created_at)) = self
             .challenge_repo
@@ -259,7 +262,7 @@ impl Service {
         // check if challenge timed out
         if now()
             > (created_at
-                .checked_add_signed(TimeDelta::seconds(challenge.ttl() as i64))
+                .checked_add_signed(challenge.ttl())
                 .expect("safe to add seconds"))
         {
             return Err(Error::Challenge("Challenge Timed Out".into()));

@@ -21,7 +21,7 @@ mod web;
 pub type ProdChallengeRepository = persistence::surreal::DBChallenges;
 pub type ProdEmailConfirmationRepository = persistence::surreal::DBEmails;
 pub type ProdEmailClient = MailjetClient;
-pub type ProdEnsClient = ens::EnsRestClient;
+pub type ProdEnsClient = ens::Client;
 pub type ProdService = service::Service;
 
 #[derive(Clone, Debug, serde::Deserialize)]
@@ -48,7 +48,7 @@ impl AppController {
             .await
             .expect("challenges repo");
         let email_client = ProdEmailClient::new(&cfg.mailjet_config);
-        let ens_client = ProdEnsClient::new(cfg.ens);
+        let ens_client = ProdEnsClient::new(cfg.ens.base_url);
 
         let mint_node_id = NodeId::new(secret_key.public_key(SECP256K1), cfg.bitcoin_network);
         let mint_private_key = secret_key.to_owned();

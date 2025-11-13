@@ -5,6 +5,7 @@ use crate::{
 use bcr_common::core::NodeId;
 use borsh::{BorshDeserialize, BorshSerialize};
 use email_address::EmailAddress;
+use secp256k1::schnorr::Signature;
 use serde::{Deserialize, Serialize};
 
 // TODO: move to bcr-common
@@ -32,7 +33,7 @@ pub struct EmailRegisterRequest {
     /// The caller email
     pub email: EmailAddress,
     /// The signed challenge by the caller
-    pub signed_challenge: String,
+    pub signed_challenge: Signature,
 }
 
 #[derive(Debug, Serialize)]
@@ -45,7 +46,7 @@ pub struct EmailConfirmRequest {
     /// A borsh-encoded EmailConfirmPayload
     pub payload: String,
     /// The signature over the payload
-    pub signature: String,
+    pub signature: Signature,
 }
 
 #[derive(Debug, BorshSerialize, BorshDeserialize)]
@@ -63,7 +64,7 @@ pub struct EmailConfirmResponse {
     /// A borsh-encoded MintSignature
     pub payload: String,
     /// The mint signature of the payload
-    pub signature: String,
+    pub signature: Signature,
     /// The mint node id
     pub mint_node_id: NodeId,
 }

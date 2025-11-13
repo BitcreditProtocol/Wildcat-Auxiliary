@@ -1,11 +1,12 @@
 use anyhow::Result;
 use bitcoin::base58;
+use chrono::TimeDelta;
 use std::fmt;
 
 pub mod persistence;
 
 /// Maximum age of a challenge - we expect requests to be made immediately after each other
-const CHALLENGE_EXPIRY_SECONDS: u64 = 120; // 2 minutes
+const CHALLENGE_EXPIRY: TimeDelta = TimeDelta::minutes(2);
 
 /// 32 random bytes, base58 encoded
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,8 +24,8 @@ impl Challenge {
         Self(challenge)
     }
 
-    pub fn ttl(&self) -> u64 {
-        CHALLENGE_EXPIRY_SECONDS
+    pub fn ttl(&self) -> TimeDelta {
+        CHALLENGE_EXPIRY
     }
 
     pub fn decode(&self) -> Result<Vec<u8>> {
