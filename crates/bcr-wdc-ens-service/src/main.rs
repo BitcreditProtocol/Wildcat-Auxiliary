@@ -1,6 +1,5 @@
 use std::env;
 use std::str::FromStr;
-
 use tokio::signal;
 use tracing::info;
 use tracing_subscriber::{filter::LevelFilter, prelude::*};
@@ -17,9 +16,7 @@ async fn main() {
     let cfg_path = env::var("ENS_CONFIG_FILE").unwrap_or_else(|_| "config.toml".to_string());
     let settings = config::Config::builder()
         .add_source(config::File::with_name(&cfg_path))
-        .add_source(
-            config::Environment::with_prefix("EBILL_NOTIFICATION_SENDING_SERVICE").separator("__"),
-        )
+        .add_source(config::Environment::with_prefix("ENS").separator("__"))
         .build()
         .expect("Failed to build ens config");
 
