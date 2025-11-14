@@ -10,6 +10,14 @@ pub enum Error {
     ChallengeRepository(AnyError),
     #[error("Email Notification Preferences Repository error {0}")]
     EmailNotificationPreferencesRepository(AnyError),
+    #[error("SignedRequest error {0}")]
+    SignedRequest(String),
+    #[error("SendEmail error {0}")]
+    SendEmail(String),
+    #[error("Challenge error {0}")]
+    Challenge(String),
+    #[error("Preferences error {0}")]
+    Preferences(String),
 }
 
 impl axum::response::IntoResponse for Error {
@@ -20,6 +28,10 @@ impl axum::response::IntoResponse for Error {
             Error::EmailNotificationPreferencesRepository(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, String::new())
             }
+            Error::SignedRequest(e) => (StatusCode::BAD_REQUEST, e),
+            Error::SendEmail(e) => (StatusCode::BAD_REQUEST, e),
+            Error::Challenge(e) => (StatusCode::BAD_REQUEST, e),
+            Error::Preferences(e) => (StatusCode::BAD_REQUEST, e),
         };
         resp.into_response()
     }

@@ -1,6 +1,8 @@
 use bcr_common::core::NodeId;
 use bitflags::bitflags;
 use email_address::EmailAddress;
+use tinytemplate::escape;
+use tracing::error;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -8,8 +10,9 @@ pub struct EmailNotificationPreferences {
     pub node_id: NodeId,
     pub company_node_id: Option<NodeId>,
     pub email: EmailAddress,
+    pub enabled: bool,
     pub preferences: PreferencesFlags,
-    pub token: Uuid,
+    pub pref_token: Uuid,
 }
 
 bitflags! {
@@ -57,5 +60,54 @@ impl Default for PreferencesFlags {
             | Self::BillPaid
             | Self::BillRecoursePaid
             | Self::BillMintingRequested
+    }
+}
+
+impl PreferencesFlags {
+    pub fn to_title(self) -> String {
+        match self {
+            Self::BillSigned => "You have been issued an eBill.".to_string(),
+            Self::BillAccepted => "An eBill has been accepted.".to_string(),
+            Self::BillAcceptanceRequested => {
+                "You have been requested to accept an eBill.".to_string()
+            }
+            Self::BillAcceptanceRejected => "Acceptance of an eBill has been rejected.".to_string(),
+            Self::BillAcceptanceTimeout => "Acceptance of an eBill has timed out.".to_string(),
+            Self::BillAcceptanceRecourse => {
+                "You have been recoursed against on an eBill because of acceptance.".to_string()
+            }
+            Self::BillPaymentRequested => "You have been requested to pay an eBill.".to_string(),
+            Self::BillPaymentRejected => "Payment of an eBill has been rejected.".to_string(),
+            Self::BillPaymentTimeout => "Payment of an eBill has timed out.".to_string(),
+            Self::BillPaymentRecourse => {
+                "You have been recoursed against on an eBill because of payment.".to_string()
+            }
+            Self::BillRecourseRejected => "Recourse of an eBill has been rejected.".to_string(),
+            Self::BillRecourseTimeout => "Recourse of an eBill has timed out.".to_string(),
+            Self::BillSellOffered => "You have been offered to buy an eBill.".to_string(),
+            Self::BillBuyingRejected => "Buying of an eBill has been rejected.".to_string(),
+            Self::BillPaid => "An eBill has been paid".to_string(),
+            Self::BillRecoursePaid => "Recourse of an eBill has been paid.".to_string(),
+            Self::BillEndorsed => "You have been endorsed an eBill.".to_string(),
+            Self::BillSold => "You have bought an eBill.".to_string(),
+            Self::BillMintingRequested => "You have been requested to mint an eBill.".to_string(),
+            Self::BillNewQuote => "There is a new quote for an eBill.".to_string(),
+            Self::BillQuoteApproved => "A quote for an eBill has been approved.".to_string(),
+            _ => "You have received a notification.".to_string(), // shouldn't happen, but safe fallback
+        }
+    }
+
+    pub fn to_link(self, url: &url::Url, id: &str) -> url::Url {
+        // currently, we only have bill notifications, so we just create a link to the bill
+        let mut path = "/bill/".to_string();
+        escape(id, &mut path);
+
+        match url.join(&path) {
+            Ok(u) => u,
+            Err(e) => {
+                error!("error creating to_link: {e}");
+                url.to_owned()
+            }
+        }
     }
 }

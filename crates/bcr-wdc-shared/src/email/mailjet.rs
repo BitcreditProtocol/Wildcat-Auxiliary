@@ -1,11 +1,12 @@
 use anyhow::anyhow;
 use async_trait::async_trait;
+use email_address::EmailAddress;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct MailJetConfig {
-    pub sender: String,
+    pub sender: EmailAddress,
     pub api_key: String,
     pub api_secret_key: String,
     pub url: url::Url,
@@ -35,10 +36,16 @@ pub trait EmailClient: Send + Sync {
 /// A simple email message. We can add more features (like html, multi recipient, etc.) later.
 #[derive(Debug, Clone)]
 pub struct EmailMessage {
-    pub from: String,
-    pub to: String,
+    pub from: EmailAddress,
+    pub to: EmailAddress,
     pub subject: String,
     pub body: String,
+}
+
+impl EmailMessage {
+    pub fn from(&self) -> &str {
+        self.from.as_ref()
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -79,13 +86,13 @@ impl From<EmailMessage> for MailjetMessage {
 #[derive(Debug, Clone, Serialize)]
 struct MailjetFrom {
     #[serde(rename = "Email")]
-    pub email: String,
+    pub email: EmailAddress,
 }
 
 #[derive(Debug, Clone, Serialize)]
 struct MailjetTo {
     #[serde(rename = "Email")]
-    pub email: String,
+    pub email: EmailAddress,
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -109,10 +109,7 @@ impl Service {
         node_id: &NodeId,
         company_node_id: &Option<NodeId>,
         email: &EmailAddress,
-        signed_challenge: &Signature,
     ) -> Result<()> {
-        self.check_challenge(node_id, signed_challenge).await?;
-
         let confirmation_code = Self::create_confirmation_code();
 
         // persist
@@ -129,7 +126,7 @@ impl Service {
         let confirmation_msg = build_email_confirmation_message(
             &self.cfg.mailjet_config.logo_url,
             &self.cfg.mailjet_config.sender,
-            email.as_ref(),
+            email,
             &confirmation_code,
         )
         .map_err(Error::EmailClient)?;
@@ -244,7 +241,7 @@ impl Service {
         Ok((sig_payload, signature))
     }
 
-    async fn check_challenge(
+    pub async fn check_challenge(
         &self,
         node_id: &NodeId,
         signed_challenge: &Signature,
@@ -258,44 +255,18 @@ impl Service {
         else {
             return Err(Error::Challenge("No Challenge Found".into()));
         };
+        challenge
+            .check(node_id, signed_challenge, created_at)
+            .map_err(|e| Error::Challenge(e.to_string()))?;
 
-        // check if challenge timed out
-        if now()
-            > (created_at
-                .checked_add_signed(challenge.ttl())
-                .expect("safe to add seconds"))
+        // delete consumed challenge
+        if let Err(e) = self
+            .challenge_repo
+            .remove_challenge_for_node_id(node_id)
+            .await
         {
-            return Err(Error::Challenge("Challenge Timed Out".into()));
+            warn!("Couldn't delete consumed challenge for {node_id}: {e}");
         }
-
-        let x_only = node_id.pub_key().x_only_public_key().0;
-
-        // check if challenge is valid
-        match signature::verify_signature(
-            &challenge
-                .decode()
-                .map_err(|_| Error::Challenge("Invalid Challenge".into()))?,
-            signed_challenge,
-            &x_only,
-        ) {
-            Ok(true) => {
-                // delete consumed challenge
-                if let Err(e) = self
-                    .challenge_repo
-                    .remove_challenge_for_node_id(node_id)
-                    .await
-                {
-                    warn!("Couldn't delete consumed challenge for {node_id}: {e}");
-                }
-            }
-            Ok(false) => {
-                return Err(Error::Challenge("Invalid Challenge".into()));
-            }
-            Err(e) => {
-                warn!("Couldn't check challenge: {e}");
-                return Err(Error::Challenge("Error Checking Challenge".into()));
-            }
-        };
 
         Ok(true)
     }

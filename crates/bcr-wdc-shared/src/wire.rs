@@ -99,3 +99,46 @@ pub struct MintSignature {
     )]
     pub created_at: TStamp,
 }
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct NotificationSendRequest {
+    /// The payload for the notification, borsh-encoded NotificationSendPayload
+    pub payload: String,
+    /// The payload signed by the sender
+    pub signature: Signature,
+}
+
+#[derive(Debug, Clone, BorshSerialize, BorshDeserialize)]
+pub struct NotificationSendPayload {
+    /// The type of event, e.g. BillSigned
+    pub kind: String,
+    /// The domain ID, e.g. a bill id
+    pub id: String,
+    /// The receiver node id
+    pub receiver_node_id: NodeId,
+    /// The receiver company_node id
+    pub receiver_company_node_id: Option<NodeId>,
+    /// The sender node id
+    pub sender_node_id: NodeId,
+}
+
+#[derive(Debug, Serialize)]
+pub struct NotificationSendResponse {
+    pub success: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GetEmailPreferencesLinkRequest {
+    /// The caller node id
+    pub node_id: NodeId,
+    /// The caller company node id (optional)
+    pub company_node_id: Option<NodeId>,
+    /// The signed challenge by the caller
+    pub signed_challenge: Signature,
+}
+
+#[derive(Debug, Serialize)]
+pub struct GetEmailPreferencesLinkResponse {
+    /// The preferences link
+    pub preferences_link: url::Url,
+}
