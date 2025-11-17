@@ -16,4 +16,4 @@ services:
         file: common-services.yml
         service: rproxy
     ports:
-      - "4444:4242"
+      - "4343:4242"
