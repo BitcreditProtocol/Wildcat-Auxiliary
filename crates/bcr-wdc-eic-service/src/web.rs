@@ -4,6 +4,7 @@ use crate::{
 };
 use axum::{Json, extract::State};
 use bcr_wdc_shared::{
+    rate_limit::RateLimiter,
     signature::verify_request,
     wire::{
         ChallengeRequest, ChallengeResponse, EmailConfirmPayload, EmailConfirmRequest,
@@ -12,6 +13,8 @@ use bcr_wdc_shared::{
 };
 use bitcoin::base58;
 use std::sync::Arc;
+use tokio::sync::Mutex;
+use tracing::warn;
 
 pub async fn health() -> &'static str {
     "{ \"status\": \"OK\" }"
@@ -32,10 +35,19 @@ pub async fn challenge(
 #[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl, req))]
 pub async fn email_register(
     State(ctrl): State<Arc<Service>>,
+    State(rl): State<Arc<Mutex<RateLimiter>>>,
     Json(req): Json<EmailRegisterRequest>,
 ) -> Result<Json<EmailRegisterResponse>> {
     ctrl.check_challenge(&req.node_id, &req.signed_challenge)
         .await?;
+
+    let mut rate_limiter = rl.lock().await;
+    let allowed = rate_limiter.check(Some(&req.email), Some(&req.node_id), None);
+    drop(rate_limiter);
+    if !allowed {
+        warn!("Rate limited req with node_id {}", &req.node_id);
+        return Err(Error::RateLimit);
+    }
 
     ctrl.register_email_for_node_id(&req.node_id, &req.company_node_id, &req.email)
         .await?;

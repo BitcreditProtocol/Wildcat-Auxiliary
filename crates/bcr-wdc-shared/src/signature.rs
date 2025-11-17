@@ -60,7 +60,7 @@ pub mod tests {
         let x_only_pub = secret_key.public_key(SECP256K1).x_only_public_key().0;
 
         // let challenge = Challenge::new();
-        let challenge = String::from("Ca2b5JS3pVQQANSYq4NCcZfkdxN7bM7gFQqWvRTiiLp8");
+        let challenge = String::from("6eoK3HnhNntraJLobPBSLqAz9z6N1KNsqnFzZyyBzDRn");
         let sig = signature(&base58::decode(&challenge).unwrap(), &secret_key);
         // print to be able to manually create requests with -- --nocapture
         println!(
@@ -83,7 +83,7 @@ pub mod tests {
         let req = EmailConfirmPayload {
             node_id: NodeId::new(secret_key.public_key(SECP256K1), bitcoin::Network::Testnet),
             company_node_id: None,
-            confirmation_code: "394810".to_string(),
+            confirmation_code: "432298".to_string(),
         };
         let serialized = borsh::to_vec(&req).unwrap();
         let payload = base58::encode(&serialized);

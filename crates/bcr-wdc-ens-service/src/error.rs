@@ -18,6 +18,8 @@ pub enum Error {
     Challenge(String),
     #[error("Preferences error {0}")]
     Preferences(String),
+    #[error("RateLimit error")]
+    RateLimit,
 }
 
 impl axum::response::IntoResponse for Error {
@@ -32,6 +34,10 @@ impl axum::response::IntoResponse for Error {
             Error::SendEmail(e) => (StatusCode::BAD_REQUEST, e),
             Error::Challenge(e) => (StatusCode::BAD_REQUEST, e),
             Error::Preferences(e) => (StatusCode::BAD_REQUEST, e),
+            Error::RateLimit => (
+                StatusCode::TOO_MANY_REQUESTS,
+                String::from("Please try again later"),
+            ),
         };
         resp.into_response()
     }

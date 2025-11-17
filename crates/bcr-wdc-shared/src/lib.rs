@@ -4,6 +4,7 @@ use std::str::FromStr;
 
 pub mod challenge;
 pub mod email;
+pub mod rate_limit;
 pub mod signature;
 pub mod wire;
 
