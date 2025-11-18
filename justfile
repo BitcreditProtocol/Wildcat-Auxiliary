@@ -17,10 +17,10 @@ system-info:
 
 # to run the services locally individually
 run-eic-service:
-    RUST_LOG=info EIC_CONFIG_FILE=docker/eic-service/config.toml cargo run --package bcr-wdc-eic-service
+    RUST_LOG=debug EIC_CONFIG_FILE=docker/eic-service/config.toml cargo run --package bcr-wdc-eic-service
 
 run-ens-service:
-    RUST_LOG=info ENS_CONFIG_FILE=docker/ens-service/config.toml cargo run --package bcr-wdc-ens-service
+    RUST_LOG=debug ENS_CONFIG_FILE=docker/ens-service/config.toml cargo run --package bcr-wdc-ens-service
 
 # to build docker containers
 build-docker-base-image:
