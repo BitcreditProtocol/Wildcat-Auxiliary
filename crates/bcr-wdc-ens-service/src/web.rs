@@ -48,7 +48,7 @@ pub async fn set_email_preferences(
     Ok(Json(SetEmailPreferencesResponse { success: true }))
 }
 
-#[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl, req))]
+#[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl, req, rl))]
 pub async fn send_email(
     State(ctrl): State<Arc<Service>>,
     State(rl): State<Arc<Mutex<RateLimiter>>>,

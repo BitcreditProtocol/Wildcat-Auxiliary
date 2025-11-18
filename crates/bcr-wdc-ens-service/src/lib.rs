@@ -77,7 +77,10 @@ pub fn routes(app: AppController) -> Router {
         .route("/v1/challenge", post(web::challenge))
         // HTML endpoints
         .route("/email/preferences/{token}", get(web::preferences))
-        .route("/email/update_preferences", post(web::update_preferences))
+        .route(
+            "/email/preferences/update_preferences",
+            post(web::update_preferences),
+        )
         // health
         .route("/health", get(web::health));
     web.with_state(app)

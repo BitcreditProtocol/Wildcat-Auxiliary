@@ -126,7 +126,7 @@ pub const ERROR_SUCCESS_TEMPLATE: &str = r#"
 
 pub const PREFERENCES_TEMPLATE: &str = r#"
     <h4>Email: {email} <br /> NodeID: {node_id} <br/ > Company NodeId: {company_node_id}</h4>
-    <form action="/email/update_preferences" method="POST">
+    <form action="/email/preferences/update_preferences" method="POST">
         <input type="hidden" name="pref_token" value="{ pref_token }"/>
         <div>
             <input {{if enabled}} checked {{endif}} type="checkbox" name="enabled" id="enabled" />
