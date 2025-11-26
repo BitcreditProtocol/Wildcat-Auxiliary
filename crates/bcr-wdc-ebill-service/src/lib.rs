@@ -2,9 +2,9 @@
 use std::sync::Arc;
 // ----- extra library imports
 use axum::{
+    Router,
     extract::FromRef,
     routing::{get, post, put},
-    Router,
 };
 use bcr_ebill_api::{
     external::{
@@ -18,11 +18,11 @@ use bcr_ebill_api::{
         notification_service::NotificationServiceApi,
     },
 };
-use bcr_ebill_transport::{create_notification_service, NostrClient, PushApi, PushService};
+use bcr_ebill_transport::{NostrClient, PushApi, PushService, create_notification_service};
 // ----- local modules
+mod convert;
 mod error;
 mod web;
-mod convert;
 // ----- end imports
 
 #[derive(Clone, Debug, serde::Deserialize)]
@@ -198,7 +198,9 @@ pub mod test_utils {
     use super::*;
     use async_trait::async_trait;
     use bcr_ebill_api::{
+        NotificationFilter,
         data::{
+            File, OptionalPostalAddress, PostalAddress,
             bill::{
                 BillAction, BillCombinedBitcoinKey, BillIssueData, BillKeys, BillsBalanceOverview,
                 BillsFilterRole, BitcreditBill, BitcreditBillResult, Endorsement,
@@ -208,19 +210,17 @@ pub mod test_utils {
             identity::{ActiveIdentityState, Identity, IdentityType, IdentityWithAll},
             mint::MintRequestState,
             notification::{ActionType, Notification},
-            File, OptionalPostalAddress, PostalAddress,
         },
         service::notification_service::NostrContactData,
         service::{
+            Error, Result,
             bill_service::Error as BillError,
             bill_service::Result as BillResult,
             notification_service::event::{BillChainEvent, CompanyChainEvent, IdentityChainEvent},
-            Error, Result,
         },
         util::BcrKeys,
-        NotificationFilter,
     };
-    use bcr_ebill_core::{blockchain::bill::BillBlockchain, ServiceTraitBounds};
+    use bcr_ebill_core::{ServiceTraitBounds, blockchain::bill::BillBlockchain};
     use bcr_ebill_core::{
         city::City, country::Country, date::Date, email::Email, identification::Identification,
         name::Name,
