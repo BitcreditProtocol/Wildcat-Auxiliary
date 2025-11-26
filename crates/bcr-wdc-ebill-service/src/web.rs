@@ -2,10 +2,10 @@
 use std::str::FromStr;
 // ----- extra library imports
 use axum::{
-    extract::{Path, Query, State},
-    http::{header, HeaderMap, HeaderValue},
-    response::IntoResponse,
     Json,
+    extract::{Path, Query, State},
+    http::{HeaderMap, HeaderValue, header},
+    response::IntoResponse,
 };
 use bcr_common::{
     core::BillId,
@@ -14,15 +14,16 @@ use bcr_common::{
 use bcr_ebill_api::{
     constants::MAX_DOCUMENT_FILE_SIZE_BYTES,
     data::{bill, contact, identity},
-    util::{self, file::detect_content_type_for_bytes, BcrKeys, ValidationError},
+    util::{self, BcrKeys, ValidationError, file::detect_content_type_for_bytes},
 };
 use bcr_ebill_core::{
+    SecretKey,
     blockchain::bill::{
-        chain::{
-            get_bill_parties_from_chain_with_plaintext, get_endorsees_from_chain_with_plaintext,
-            BillBlockPlaintextWrapper,
-        },
         BillBlock, BillBlockchain,
+        chain::{
+            BillBlockPlaintextWrapper, get_bill_parties_from_chain_with_plaintext,
+            get_endorsees_from_chain_with_plaintext,
+        },
     },
     city::City,
     country::Country,
@@ -30,16 +31,14 @@ use bcr_ebill_core::{
     email::Email,
     identification::Identification,
     name::Name,
-    SecretKey,
 };
 use futures::StreamExt;
 use reqwest::StatusCode;
 // ----- local imports
 
 use crate::{
+    AppController, convert,
     error::{Error, Result},
-    AppController,
-    convert,
 };
 // ----- end imports
 
