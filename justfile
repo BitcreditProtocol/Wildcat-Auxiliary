@@ -32,4 +32,7 @@ build-docker-eic-service: build-docker-base-image
 build-docker-ens-service: build-docker-base-image
     docker build -t wildcat/ens-service -f docker/ens-service/Dockerfile .
 
-build-docker-images: build-docker-eic-service build-docker-ens-service
+build-docker-ebill-service: build-docker-base-image
+    docker build -t wildcat/ebill-service -f docker/ebill-service/Dockerfile .
+
+build-docker-images: build-docker-eic-service build-docker-ens-service build-docker-ebill-service
