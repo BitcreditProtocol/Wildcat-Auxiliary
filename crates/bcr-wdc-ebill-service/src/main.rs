@@ -28,7 +28,13 @@ async fn main() {
     // parse and create config
     let settings = config::Config::builder()
         .add_source(config::File::with_name("config.toml"))
-        .add_source(config::Environment::with_prefix("EBILL").separator("__"))
+        .add_source(
+            config::Environment::with_prefix("EBILL")
+                .separator("__")
+                .list_separator(",")
+                .with_list_parse_key("appcfg.nostr_cfg.relays")
+                .try_parsing(true),
+        )
         .build()
         .expect("Failed to build ebill config");
 
@@ -54,7 +60,7 @@ async fn main() {
         bitcoin_network: maincfg.appcfg.bitcoin_network.clone(),
         esplora_base_url: maincfg.appcfg.esplora_base_url.clone(),
         nostr_config: NostrConfig {
-            relays: vec![maincfg.appcfg.nostr_cfg.relay.clone()],
+            relays: maincfg.appcfg.nostr_cfg.relays.clone(),
             only_known_contacts: maincfg.appcfg.nostr_cfg.only_known_contacts,
         },
         mint_config: MintConfig {
