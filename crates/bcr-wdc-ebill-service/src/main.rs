@@ -54,7 +54,7 @@ async fn main() {
         bitcoin_network: maincfg.appcfg.bitcoin_network.clone(),
         esplora_base_url: maincfg.appcfg.esplora_base_url.clone(),
         nostr_config: NostrConfig {
-            relays: maincfg.appcfg.nostr_cfg.relays.clone(),
+            relays: vec![maincfg.appcfg.nostr_cfg.relay.clone()],
             only_known_contacts: maincfg.appcfg.nostr_cfg.only_known_contacts,
         },
         mint_config: MintConfig {

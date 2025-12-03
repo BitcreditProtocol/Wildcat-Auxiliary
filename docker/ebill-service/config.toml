@@ -7,7 +7,7 @@ namespace = "test"
 database = "ebill"
 
 [appcfg.nostr_cfg]
-relays = ["wss://bcr-relay-dev.minibill.tech"]
+relay = "wss://bcr-relay-dev.minibill.tech"
 only_known_contacts = false
 
 [appcfg.mint_config]

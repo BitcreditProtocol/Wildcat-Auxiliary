@@ -41,10 +41,10 @@ pub struct AppConfig {
     pub dev_mode_config: DevModeConfig,
 }
 
-#[derive(Debug, Clone, Default, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct NostrConfig {
     pub only_known_contacts: bool,
-    pub relays: Vec<url::Url>,
+    pub relay: url::Url,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
