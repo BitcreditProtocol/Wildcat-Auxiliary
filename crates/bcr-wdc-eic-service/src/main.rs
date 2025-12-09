@@ -1,4 +1,5 @@
-use secp256k1::SecretKey;
+use bcr_common::core::NodeId;
+use secp256k1::{SECP256K1, SecretKey};
 use std::env;
 use std::str::FromStr;
 use tokio::signal;
@@ -38,7 +39,7 @@ async fn main() {
     let seedcfg: SeedConfig = settings
         .try_deserialize()
         .expect("Failed to parse seed config");
-    let seed = seedcfg.mnemonic.to_seed("eBill-identity-confirmation");
+    let seed = seedcfg.mnemonic.to_seed(""); // consistent with E-Bill
     let (key, _) = seed.split_at(32);
     let secret_key = SecretKey::from_slice(key).expect("can create key from seed");
 
@@ -50,6 +51,8 @@ async fn main() {
         .expect("tracing::subscriber::set_global_default");
     let network = maincfg.appcfg.bitcoin_network;
 
+    let node_id = NodeId::new(secret_key.public_key(SECP256K1), network);
+
     let app = bcr_wdc_eic_service::AppController::new(&secret_key, maincfg.appcfg).await;
     let router = bcr_wdc_eic_service::routes(app);
 
@@ -58,7 +61,7 @@ async fn main() {
         .expect("Failed to bind to address");
 
     info!(
-        "Listening on {}, network: {}",
+        "Listening on {}, network: {}, node_id: {node_id}",
         &maincfg.bind_address, &network
     );
     axum::serve(listener, router)
