@@ -4,7 +4,7 @@ use bcr_ebill_api::{CourtConfig, DevModeConfig, MintConfig, NostrConfig, Payment
 use bcr_ebill_transport::{
     chain_keys::ChainKeyService, create_nostr_clients, create_nostr_consumer,
 };
-use std::str::FromStr;
+use std::{env, str::FromStr};
 // ----- extra library imports
 use tokio::signal;
 use tracing::info;
@@ -22,12 +22,13 @@ struct MainConfig {
 
 #[tokio::main]
 async fn main() {
+    let cfg_path = env::var("EBILL_CONFIG_FILE").unwrap_or_else(|_| "config.toml".to_string());
     rustls::crypto::ring::default_provider()
         .install_default()
         .expect("failed to install default provider for rustls ring");
     // parse and create config
     let settings = config::Config::builder()
-        .add_source(config::File::with_name("config.toml"))
+        .add_source(config::File::with_name(&cfg_path))
         .add_source(
             config::Environment::with_prefix("EBILL")
                 .separator("__")
@@ -148,7 +149,10 @@ async fn main() {
     .expect("Failed to create Nostr consumer");
     // run nostr consumer in background
     let nostr_handle = tokio::spawn(async move {
-        nostr_consumer.start().await.expect("nostr consumer failed");
+        let mut handle = nostr_consumer.start().await.expect("nostr consumer failed");
+        while let Some(Ok(_)) = handle.join_next().await {
+            info!("Nostr consumer task shutdown with success");
+        }
     });
 
     // run web server
