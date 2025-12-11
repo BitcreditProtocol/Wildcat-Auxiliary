@@ -57,6 +57,10 @@ async fn main() {
         },
         dev_mode_config: DevModeConfig {
             on: maincfg.appcfg.dev_mode_config.on,
+            disable_mandatory_email_confirmations: maincfg
+                .appcfg
+                .dev_mode_config
+                .disable_mandatory_email_confirmations,
         },
         bitcoin_network: maincfg.appcfg.bitcoin_network.clone(),
         esplora_base_url: maincfg.appcfg.esplora_base_url.clone(),
@@ -71,12 +75,16 @@ async fn main() {
             )
             .expect("Invalid Mint Node Id"),
         },
-        db_config: bcr_ebill_api::SurrealDbConfig {
+        db_config: bcr_ebill_persistence::db::SurrealDbConfig {
             connection_string: maincfg.appcfg.ebill_db.connection.clone(),
             namespace: maincfg.appcfg.ebill_db.namespace.clone(),
             database: maincfg.appcfg.ebill_db.database.clone(),
         },
-        data_dir: maincfg.appcfg.data_dir.clone(),
+        files_db_config: bcr_ebill_persistence::db::SurrealDbConfig {
+            connection_string: maincfg.appcfg.ebill_db.connection.clone(),
+            namespace: maincfg.appcfg.ebill_db.namespace.clone(),
+            database: maincfg.appcfg.ebill_db.database.clone(),
+        },
         app_url: maincfg.appcfg.url.clone(),
         payment_config: PaymentConfig {
             num_confirmations_for_payment: maincfg

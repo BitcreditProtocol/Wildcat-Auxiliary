@@ -1,7 +1,7 @@
 // ----- standard library imports
 use std::time::Duration;
 // ----- extra library imports
-use bcr_ebill_api::util::date::now;
+use bcr_ebill_core::protocol::Timestamp;
 use bcr_wdc_ebill_service::AppController;
 use tokio::time::{interval, sleep};
 use tracing::{error, info};
@@ -61,12 +61,8 @@ async fn run_check_bill_recourse_payment_job(app: AppController) {
 
 async fn run_check_bill_timeouts(app: AppController) {
     info!("Running Check Bill Timeouts Job");
-    let current_time = now().timestamp();
-    if let Err(e) = app
-        .bill_service
-        .check_bills_timeouts(current_time as u64)
-        .await
-    {
+    let current_time = Timestamp::now();
+    if let Err(e) = app.bill_service.check_bills_timeouts(current_time).await {
         error!("Error while running Check Bill Timeouts Job: {e}");
     }
 

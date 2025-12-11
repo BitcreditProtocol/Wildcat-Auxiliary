@@ -15,6 +15,7 @@ bcr-common = {workspace = true}
 bcr-ebill-api.workspace = true
 bcr-ebill-core = {workspace = true}
 bcr-ebill-transport.workspace = true
+bcr-ebill-persistence.workspace = true
 bip39 = {workspace = true, features = ["serde"]}
 bitcoin = {workspace = true, features = ["serde"]}
 borsh.workspace = true
@@ -33,3 +34,4 @@ tracing = {workspace = true, features = ["log"]}
 tracing-log = {workspace = true}
 tracing-subscriber = {workspace = true, features = ["serde"]}
 url = {workspace = true, features = ["serde"]}
+uuid = {workspace = true}

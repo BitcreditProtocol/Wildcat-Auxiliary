@@ -13,27 +13,27 @@ use bcr_common::{
 };
 use bcr_ebill_api::{
     constants::MAX_DOCUMENT_FILE_SIZE_BYTES,
-    data::{bill, contact, identity},
-    util::{self, BcrKeys, ValidationError, file::detect_content_type_for_bytes},
+    service::file_upload_service::detect_content_type_for_bytes,
 };
 use bcr_ebill_core::{
-    SecretKey,
-    blockchain::bill::{
-        BillBlock, BillBlockchain,
-        chain::{
-            BillBlockPlaintextWrapper, get_bill_parties_from_chain_with_plaintext,
-            get_endorsees_from_chain_with_plaintext,
+    application::identity::IdentityWithAll,
+    protocol::{
+        City, Country, Currency, Date, Email, Identification, Name, ProtocolValidationError,
+        SchnorrSignature, Sha256Hash, Timestamp,
+        blockchain::bill::{
+            BillBlock, BillBlockchain,
+            chain::{
+                BillBlockPlaintextWrapper, get_bill_parties_from_chain_with_plaintext,
+                get_endorsees_from_chain_with_plaintext,
+            },
         },
+        crypto::{self, BcrKeys},
     },
-    city::City,
-    country::Country,
-    date::Date,
-    email::Email,
-    identification::Identification,
-    name::Name,
 };
+use bitcoin::{base58, secp256k1::SecretKey};
 use futures::StreamExt;
 use reqwest::StatusCode;
+use uuid::Uuid;
 // ----- local imports
 
 use crate::{
@@ -64,13 +64,14 @@ pub fn get_chain_with_plaintext_from_shared_bill(
     shared_bill: &wire_quotes::SharedBill,
     private_key: &SecretKey,
 ) -> Result<Vec<BillBlockPlaintextWrapper>> {
-    let decoded = util::base58_decode(&shared_bill.data)
+    let decoded = base58::decode(&shared_bill.data)
         .map_err(|e| Error::SharedBill(format!("base58 decode: {e}")))?;
-    let decrypted = util::crypto::decrypt_ecies(&decoded, private_key)
+    let decrypted = crypto::decrypt_ecies(&decoded, private_key)
         .map_err(|e| Error::SharedBill(format!("decryption: {e}")))?;
 
     // check that hash matches
-    if shared_bill.hash != util::sha256_hash(&decrypted) {
+    let shared_bill_hash = Sha256Hash::from_str(&shared_bill.hash)?;
+    if shared_bill_hash != Sha256Hash::from_bytes(&decrypted) {
         return Err(Error::SharedBill("Invalid Hash".to_string()));
     }
 
@@ -93,8 +94,7 @@ pub async fn validate_and_decrypt_shared_bill(
     Json(payload): Json<wire_quotes::SharedBill>,
 ) -> Result<Json<wire_quotes::BillInfo>> {
     tracing::debug!("Received validate and decrypt shared bill request");
-    let identity::IdentityWithAll { identity, key_pair } =
-        ctrl.identity_service.get_full_identity().await?;
+    let IdentityWithAll { identity, key_pair } = ctrl.identity_service.get_full_identity().await?;
 
     // check that our pub key is the receiver pub key
     if identity.node_id.pub_key() != payload.receiver.inner {
@@ -118,7 +118,7 @@ pub async fn validate_and_decrypt_shared_bill(
     // validate plaintext hash
     for block_wrapper in chain_with_plaintext.iter() {
         if block_wrapper.block.plaintext_hash
-            != util::sha256_hash(&block_wrapper.plaintext_data_bytes)
+            != Sha256Hash::from_bytes(&block_wrapper.plaintext_data_bytes)
         {
             return Err(Error::SharedBill("Plaintext hash mismatch".into()));
         }
@@ -141,11 +141,9 @@ pub async fn validate_and_decrypt_shared_bill(
     let holder = bill_parties.endorsee.unwrap_or(bill_parties.payee.clone());
 
     // verify signature
-    match util::crypto::verify(
-        &payload.hash,
-        &payload.signature,
-        &holder.node_id().pub_key(),
-    ) {
+    let sig = SchnorrSignature::new(&payload.signature)?;
+    let hash = Sha256Hash::from_str(&payload.hash)?;
+    match sig.verify(&hash, &holder.node_id().pub_key()) {
         Ok(res) => {
             if !res {
                 return Err(Error::SharedBill("Invalid signature".into()));
@@ -157,24 +155,29 @@ pub async fn validate_and_decrypt_shared_bill(
     // validate files by downloading, encrypting and checking hashes
     if !payload.file_urls.is_empty() {
         let bill_file_hashes: Vec<String> =
-            bill_data.files.iter().map(|f| f.hash.clone()).collect();
+            bill_data.files.iter().map(|f| f.hash.to_string()).collect();
         let mut file_hashes = Vec::with_capacity(bill_file_hashes.len());
         for file_url in payload.file_urls.iter() {
             let (_, decrypted) =
                 do_get_encrypted_bill_file_from_request_to_mint(&key_pair, file_url).await?;
-            file_hashes.push(util::sha256_hash(&decrypted));
+            file_hashes.push(Sha256Hash::from_bytes(&decrypted));
         }
         // all of the shared file hashes have to be present on the bill
         if file_hashes.len() != bill_file_hashes.len()
-            || !file_hashes.iter().all(|f| bill_file_hashes.contains(f))
+            || !file_hashes
+                .iter()
+                .all(|f| bill_file_hashes.contains(&f.to_string()))
         {
             return Err(Error::SharedBill("File hashes don't match".into()));
         }
     }
 
-    let core_drawer: bcr_ebill_core::contact::BillIdentParticipant = bill_parties.drawer.into();
-    let core_drawee: bcr_ebill_core::contact::BillIdentParticipant = bill_parties.drawee.into();
-    let core_payee: bcr_ebill_core::contact::BillParticipant = bill_parties.payee.into();
+    let core_drawer: bcr_ebill_core::protocol::blockchain::bill::participant::BillIdentParticipant =
+        bill_parties.drawer.into();
+    let core_drawee: bcr_ebill_core::protocol::blockchain::bill::participant::BillIdentParticipant =
+        bill_parties.drawee.into();
+    let core_payee: bcr_ebill_core::protocol::blockchain::bill::participant::BillParticipant =
+        bill_parties.payee.into();
     let core_endorsees: Vec<wire_bill::BillParticipant> = endorsees
         .into_iter()
         .map(convert::billparticipant_ebill2wire)
@@ -189,7 +192,7 @@ pub async fn validate_and_decrypt_shared_bill(
         drawer: convert::billidentparticipant_ebill2wire(core_drawer),
         payee: convert::billparticipant_ebill2wire(core_payee),
         endorsees: core_endorsees,
-        sum: bill_data.sum,
+        sum: bill_data.sum.as_sat(),
         maturity_date,
         file_urls: payload.file_urls,
     }))
@@ -244,7 +247,7 @@ pub async fn create_identity(
         return Err(crate::error::Error::IdentityAlreadyExists);
     }
 
-    let current_timestamp = util::date::now().timestamp() as u64;
+    let current_timestamp = Timestamp::now();
     ctrl.identity_service
         .create_identity(
             convert::identitytype_wire2ebill(
@@ -269,8 +272,18 @@ pub async fn create_identity(
                 .identification_number
                 .map(Identification::new)
                 .transpose()?,
-            payload.profile_picture_file_upload_id,
-            payload.identity_document_file_upload_id,
+            payload
+                .profile_picture_file_upload_id
+                .map(|s| {
+                    Uuid::from_str(&s).map_err(|_| ProtocolValidationError::InvalidFileUploadId)
+                })
+                .transpose()?,
+            payload
+                .identity_document_file_upload_id
+                .map(|s| {
+                    Uuid::from_str(&s).map_err(|_| ProtocolValidationError::InvalidFileUploadId)
+                })
+                .transpose()?,
             current_timestamp,
         )
         .await?;
@@ -297,7 +310,7 @@ pub async fn get_bill_detail(
     Path(bill_id): Path<BillId>,
 ) -> Result<Json<wire_bill::BitcreditBill>> {
     tracing::debug!("Received get bill detail request");
-    let current_timestamp = util::date::now().timestamp() as u64;
+    let current_timestamp = Timestamp::now();
     let identity = ctrl.identity_service.get_identity().await?;
     let bill_detail = ctrl
         .bill_service
@@ -313,7 +326,7 @@ pub async fn get_bill_payment_status(
     Path(bill_id): Path<BillId>,
 ) -> Result<Json<SimplifiedBillPaymentStatus>> {
     tracing::debug!("Received get bill payment status request");
-    let current_timestamp = util::date::now().timestamp() as u64;
+    let current_timestamp = Timestamp::now();
     let identity = ctrl.identity_service.get_identity().await?;
     let bill_detail = ctrl
         .bill_service
@@ -321,7 +334,7 @@ pub async fn get_bill_payment_status(
         .await?;
     let payment_status = bill_detail.status.payment;
     let payment_details = match bill_detail.current_waiting_state {
-        Some(bcr_ebill_api::data::bill::BillCurrentWaitingState::Payment(payment)) => {
+        Some(bcr_ebill_core::application::bill::BillCurrentWaitingState::Payment(payment)) => {
             Some(convert::billwaitingforpaymentstate_ebill2wire(payment))
         }
         _ => None,
@@ -340,7 +353,7 @@ pub async fn get_bill_endorsements(
 ) -> Result<Json<Vec<wire_bill::Endorsement>>> {
     tracing::debug!("Received get bill detail request");
 
-    let now = util::date::now().timestamp() as u64;
+    let now = Timestamp::now();
     let identity = ctrl.identity_service.get_identity().await?;
     let endorsements = ctrl
         .bill_service
@@ -360,7 +373,7 @@ pub async fn get_bill_attachment(
     Path((bill_id, file_name)): Path<(BillId, String)>,
 ) -> Result<impl IntoResponse> {
     tracing::debug!("Received get bill attachment request");
-    let current_timestamp = util::date::now().timestamp() as u64;
+    let current_timestamp = Timestamp::now();
     let identity = ctrl.identity_service.get_identity().await?;
     // get bill
     let bill = ctrl
@@ -369,7 +382,12 @@ pub async fn get_bill_attachment(
         .await?;
 
     // check if this file even exists on the bill
-    let file = match bill.data.files.iter().find(|f| f.name == file_name) {
+    let file = match bill
+        .data
+        .files
+        .iter()
+        .find(|f| f.name.to_string() == file_name)
+    {
         Some(f) => f,
         None => {
             return Err(bcr_ebill_api::service::bill_service::Error::NotFound.into());
@@ -379,15 +397,19 @@ pub async fn get_bill_attachment(
     let keys = ctrl.bill_service.get_bill_keys(&bill_id).await?;
     let file_bytes = ctrl
         .bill_service
-        .open_and_decrypt_attached_file(&bill_id, file, &keys.private_key)
+        .open_and_decrypt_attached_file(&bill_id, file, &keys.get_private_key())
         .await
         .map_err(|_| bcr_ebill_api::service::Error::NotFound)?;
 
     let content_type = detect_content_type_for_bytes(&file_bytes).ok_or(
-        bcr_ebill_api::service::Error::Validation(ValidationError::InvalidContentType),
+        bcr_ebill_api::service::Error::Validation(
+            ProtocolValidationError::InvalidContentType.into(),
+        ),
     )?;
     let parsed_content_type: HeaderValue = content_type.parse().map_err(|_| {
-        bcr_ebill_api::service::Error::Validation(ValidationError::InvalidContentType)
+        bcr_ebill_api::service::Error::Validation(
+            ProtocolValidationError::InvalidContentType.into(),
+        )
     })?;
     let mut headers = HeaderMap::new();
     headers.insert(header::CONTENT_TYPE, parsed_content_type);
@@ -409,7 +431,9 @@ pub async fn get_encrypted_bill_file_from_request_to_mint(
     let (content_type, decrypted) =
         do_get_encrypted_bill_file_from_request_to_mint(&keys, &bill_file_url_req.file_url).await?;
     let parsed_content_type: HeaderValue = content_type.parse().map_err(|_| {
-        bcr_ebill_api::service::Error::Validation(ValidationError::InvalidContentType)
+        bcr_ebill_api::service::Error::Validation(
+            ProtocolValidationError::InvalidContentType.into(),
+        )
     })?;
     let mut headers = HeaderMap::new();
     headers.insert(header::CONTENT_TYPE, parsed_content_type);
@@ -465,15 +489,16 @@ async fn do_get_encrypted_bill_file_from_request_to_mint(
     }
 
     // decrypt file with private key
-    let decrypted =
-        util::crypto::decrypt_ecies(&file_bytes, &keys.get_private_key()).map_err(|e| {
-            tracing::error!("Error decrypting file from {}: {e}", file_url.to_string());
-            Error::FileDownload("Decryption Error".into())
-        })?;
+    let decrypted = crypto::decrypt_ecies(&file_bytes, &keys.get_private_key()).map_err(|e| {
+        tracing::error!("Error decrypting file from {}: {e}", file_url.to_string());
+        Error::FileDownload("Decryption Error".into())
+    })?;
 
     // detect content type and return response
     let content_type = detect_content_type_for_bytes(&decrypted).ok_or(
-        bcr_ebill_api::service::Error::Validation(ValidationError::InvalidContentType),
+        bcr_ebill_api::service::Error::Validation(
+            ProtocolValidationError::InvalidContentType.into(),
+        ),
     )?;
 
     Ok((content_type, decrypted))
@@ -486,19 +511,22 @@ pub async fn request_to_pay_bill(
 ) -> Result<Json<SuccessResponse>> {
     tracing::debug!("Received request to pay bill request");
 
-    let current_timestamp = util::date::now().timestamp() as u64;
-    let identity::IdentityWithAll { identity, key_pair } =
-        ctrl.identity_service.get_full_identity().await?;
+    let current_timestamp = Timestamp::now();
+    let IdentityWithAll { identity, key_pair } = ctrl.identity_service.get_full_identity().await?;
 
-    let deadline_ts = request_to_pay_bill_payload.deadline.timestamp() as u64;
+    let deadline_ts = Timestamp::from(request_to_pay_bill_payload.deadline);
     ctrl.bill_service
         .execute_bill_action(
             &request_to_pay_bill_payload.bill_id,
-            bill::BillAction::RequestToPay(
-                request_to_pay_bill_payload.currency.clone(),
+            bcr_ebill_core::protocol::blockchain::bill::BillAction::RequestToPay(
+                Currency::sat(),
                 deadline_ts,
             ),
-            &contact::BillParticipant::Ident(contact::BillIdentParticipant::new(identity)?),
+            &bcr_ebill_core::protocol::blockchain::bill::participant::BillParticipant::Ident(
+                bcr_ebill_core::protocol::blockchain::bill::participant::BillIdentParticipant::new(
+                    identity,
+                )?,
+            ),
             &key_pair,
             current_timestamp,
         )
@@ -513,13 +541,16 @@ pub async fn bill_bitcoin_key(
     Path(bill_id): Path<BillId>,
 ) -> Result<Json<wire_bill::BillCombinedBitcoinKey>> {
     tracing::debug!("Received get bill bitcoin private key request");
-    let identity::IdentityWithAll { identity, key_pair } =
-        ctrl.identity_service.get_full_identity().await?;
+    let IdentityWithAll { identity, key_pair } = ctrl.identity_service.get_full_identity().await?;
     let combined_key = ctrl
         .bill_service
         .get_combined_bitcoin_key_for_bill(
             &bill_id,
-            &contact::BillParticipant::Ident(contact::BillIdentParticipant::new(identity)?),
+            &bcr_ebill_core::protocol::blockchain::bill::participant::BillParticipant::Ident(
+                bcr_ebill_core::protocol::blockchain::bill::participant::BillIdentParticipant::new(
+                    identity,
+                )?,
+            ),
             &key_pair,
         )
         .await?;
