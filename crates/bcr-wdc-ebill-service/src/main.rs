@@ -8,7 +8,10 @@ use std::{env, str::FromStr};
 // ----- extra library imports
 use tokio::signal;
 use tracing::info;
-use tracing_subscriber::{filter::LevelFilter, prelude::*};
+use tracing_subscriber::{
+    filter::{LevelFilter, Targets},
+    prelude::*,
+};
 // ----- local modules
 mod job;
 // ----- end imports
@@ -18,6 +21,7 @@ struct MainConfig {
     bind_address: std::net::SocketAddr,
     appcfg: bcr_wdc_ebill_service::AppConfig,
     log_level: String,
+    restart_nostr_consumer_interval_secs: u64,
 }
 
 #[tokio::main]
@@ -45,7 +49,17 @@ async fn main() {
 
     tracing_log::LogTracer::init().expect("LogTracer init");
     let level_filter = LevelFilter::from_str(&maincfg.log_level).expect("log level");
-    let stdout_log = tracing_subscriber::fmt::layer().with_filter(level_filter);
+    let targets = Targets::new()
+        .with_default(LevelFilter::INFO)
+        .with_target("nostr_relay_pool", LevelFilter::INFO)
+        .with_target("bcr_ebill_api", level_filter)
+        .with_target("bcr_ebill_core", level_filter)
+        .with_target("bcr_ebill_transport", level_filter)
+        .with_target("bcr_ebill_persistence", level_filter)
+        .with_target("bcr_common", level_filter);
+    let stdout_log = tracing_subscriber::fmt::layer()
+        .with_filter(level_filter)
+        .with_filter(targets);
     let subscriber = tracing_subscriber::registry().with(stdout_log);
     tracing::subscriber::set_global_default(subscriber)
         .expect("tracing::subscriber::set_global_default");
@@ -124,6 +138,7 @@ async fn main() {
     )
     .await
     .expect("Failed to create nostr clients");
+
     let db_clone = db.clone();
     // set up application context
     let app =
@@ -143,7 +158,7 @@ async fn main() {
 
     // set up nostr event consumer
     let nostr_consumer = create_nostr_consumer(
-        nostr_clients,
+        nostr_clients.clone(),
         app.contact_service.clone(),
         app.push_service.clone(),
         std::sync::Arc::new(ChainKeyService::new(
@@ -155,11 +170,39 @@ async fn main() {
     )
     .await
     .expect("Failed to create Nostr consumer");
-    // run nostr consumer in background
+
+    // run nostr consumer in the background and restart regularly so we don't drop events
     let nostr_handle = tokio::spawn(async move {
-        let mut handle = nostr_consumer.start().await.expect("nostr consumer failed");
-        while let Some(Ok(_)) = handle.join_next().await {
-            info!("Nostr consumer task shutdown with success");
+        info!(
+            "Starting Nostr Consumer Loop - restart interval {}s",
+            maincfg.restart_nostr_consumer_interval_secs
+        );
+        let interval = std::time::Duration::from_secs(maincfg.restart_nostr_consumer_interval_secs);
+
+        loop {
+            let mut joinset = nostr_consumer.start().await.expect("nostr consumer failed");
+
+            // for each interval, or if a task exits, we re-start the consumer
+            let reason = tokio::select! {
+                _ = tokio::time::sleep(interval) => "interval elapsed",
+                _ = joinset.join_next() => "a task finished",
+            };
+
+            info!("Restarting nostr consumer - reason: {reason}");
+
+            joinset.abort_all();
+
+            // flush tasks, so we don't leak tasks
+            while joinset.join_next().await.is_some() {
+                info!("Nostr consumer task shutdown");
+            }
+
+            // unsubscribe all, so we re-subscribe again on re-connect
+            for nostr_client in &nostr_clients {
+                if let Ok(cl) = nostr_client.client().await {
+                    cl.unsubscribe_all().await;
+                }
+            }
         }
     });
 
