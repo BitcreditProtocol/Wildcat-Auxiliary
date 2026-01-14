@@ -21,7 +21,7 @@ struct MainConfig {
     bind_address: std::net::SocketAddr,
     appcfg: bcr_wdc_ebill_service::AppConfig,
     log_level: String,
-    restart_nostr_consumer_interval_secs: u64,
+    restart_nostr_consumer_interval_secs: Option<u64>,
 }
 
 #[tokio::main]
@@ -171,13 +171,16 @@ async fn main() {
     .await
     .expect("Failed to create Nostr consumer");
 
+    let nostr_consumer_restart_interval =
+        maincfg.restart_nostr_consumer_interval_secs.unwrap_or(120);
+
     // run nostr consumer in the background and restart regularly so we don't drop events
     let nostr_handle = tokio::spawn(async move {
         info!(
             "Starting Nostr Consumer Loop - restart interval {}s",
-            maincfg.restart_nostr_consumer_interval_secs
+            nostr_consumer_restart_interval
         );
-        let interval = std::time::Duration::from_secs(maincfg.restart_nostr_consumer_interval_secs);
+        let interval = std::time::Duration::from_secs(nostr_consumer_restart_interval);
 
         loop {
             let mut joinset = nostr_consumer.start().await.expect("nostr consumer failed");
