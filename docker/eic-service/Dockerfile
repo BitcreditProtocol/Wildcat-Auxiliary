@@ -16,4 +16,4 @@ COPY --from=rust-builder /wildcat/target/release/bcr-wdc-eic-service .
 # Expose web server port
 EXPOSE 3338
 
-CMD ["/eic-service/bcr-wdc-eic-service"]
+ENTRYPOINT ["/eic-service/bcr-wdc-eic-service"]

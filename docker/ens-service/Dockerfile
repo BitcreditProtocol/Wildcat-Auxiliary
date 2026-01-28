@@ -16,4 +16,4 @@ COPY --from=rust-builder /wildcat/target/release/bcr-wdc-ens-service .
 # Expose web server port
 EXPOSE 3339
 
-CMD ["/ens-service/bcr-wdc-ens-service"]
+ENTRYPOINT ["/ens-service/bcr-wdc-ens-service"]
