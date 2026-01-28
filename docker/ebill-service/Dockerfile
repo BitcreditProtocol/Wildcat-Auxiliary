@@ -16,4 +16,4 @@ COPY --from=rust-builder /wildcat/target/release/bcr-wdc-ebill-service .
 # Expose web server port
 EXPOSE 3338
 
-CMD ["/ebill-service/bcr-wdc-ebill-service"]
+ENTRYPOINT ["/ebill-service/bcr-wdc-ebill-service"]
