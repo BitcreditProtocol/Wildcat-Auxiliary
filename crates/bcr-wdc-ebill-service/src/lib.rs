@@ -18,6 +18,7 @@ use bcr_ebill_api::{
         transport_service::TransportServiceApi,
     },
 };
+use bcr_ebill_core::protocol::{Address, City, Country, Email, Name, Zip};
 use bcr_ebill_transport::{NostrClient, PushApi, PushService, create_transport_service};
 // ----- local modules
 mod convert;
@@ -38,6 +39,7 @@ pub struct AppConfig {
     pub url: url::Url,
     pub court_config: CourtConfig,
     pub dev_mode_config: DevModeConfig,
+    pub identity_config: IdentityConfig,
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
@@ -76,6 +78,16 @@ pub struct DevModeConfig {
     pub on: bool,
     /// Whether mandatory email confirmations should be enabled (disable for easier testing)
     pub disable_mandatory_email_confirmations: bool,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct IdentityConfig {
+    pub name: Name,
+    pub email: Email,
+    pub country: Country,
+    pub city: City,
+    pub zip: Zip,
+    pub address: Address,
 }
 
 #[derive(Clone, FromRef)]
