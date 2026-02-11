@@ -23,7 +23,7 @@ run-ens-service:
     RUST_LOG=debug ENS_CONFIG_FILE=docker/ens-service/config.toml cargo run --package bcr-wdc-ens-service
 
 run-ebill-service:
-    RUST_LOG=debug EBILL_CONFIG_FILE=docker/ebill-service/config.toml cargo run --package bcr-wdc-ebill-service
+    EBILL_MNEMONIC="abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about" RUST_LOG=debug EBILL_CONFIG_FILE=docker/ebill-service/config.toml cargo run --package bcr-wdc-ebill-service
 
 # to build docker containers
 build-docker-base-image:

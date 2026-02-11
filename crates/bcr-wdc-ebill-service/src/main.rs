@@ -1,6 +1,9 @@
 // ----- standard library imports
 use bcr_common::core::NodeId;
 use bcr_ebill_api::{CourtConfig, DevModeConfig, MintConfig, NostrConfig, PaymentConfig};
+use bcr_ebill_core::protocol::{
+    OptionalPostalAddress, Timestamp, blockchain::identity::IdentityType, crypto::BcrKeys,
+};
 use bcr_ebill_transport::{
     chain_keys::ChainKeyService, create_nostr_clients, create_nostr_consumer,
 };
@@ -22,6 +25,11 @@ struct MainConfig {
     appcfg: bcr_wdc_ebill_service::AppConfig,
     log_level: String,
     restart_nostr_consumer_interval_secs: Option<u64>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct SeedConfig {
+    mnemonic: bip39::Mnemonic,
 }
 
 #[tokio::main]
@@ -46,6 +54,18 @@ async fn main() {
     let maincfg: MainConfig = settings
         .try_deserialize()
         .expect("Failed to parse ebill config");
+
+    // seed is acquired from environment variables
+    let settings = config::Config::builder()
+        .add_source(config::Environment::with_prefix("EBILL"))
+        .build()
+        .expect("Failed to build seed config");
+
+    let seedcfg: SeedConfig = settings
+        .try_deserialize()
+        .expect("Failed to parse seed config");
+    let keys_from_mnemonic = BcrKeys::from_seedphrase(&seedcfg.mnemonic.to_string())
+        .expect("Failed to build keys from seed phrase");
 
     tracing_log::LogTracer::init().expect("LogTracer init");
     let level_filter = LevelFilter::from_str(&maincfg.log_level).expect("log level");
@@ -119,15 +139,25 @@ async fn main() {
         .await
         .expect("Couldn't set, or check btc network");
 
-    // initialize identity keys
-    let keys = db
-        .identity_store
-        .get_or_create_key_pair()
-        .await
-        .expect("Failed to get, or create local identity keys");
+    // initialize identity keys from mnemonic, if they're not set
+    let keys = match db.identity_store.get_key_pair().await {
+        Ok(keys) => keys,
+        Err(_) => {
+            info!("No key pair found - setting it from given mnemonic");
+            db.identity_store
+                .save_key_pair(&keys_from_mnemonic, &seedcfg.mnemonic.to_string())
+                .await
+                .expect("Could not create key from mnemonic");
+            keys_from_mnemonic.clone()
+        }
+    };
+
+    if keys != keys_from_mnemonic {
+        panic!("Keys from mnemonic don't match keys in the database");
+    }
+
     let local_node_id = NodeId::new(keys.pub_key(), api_config.bitcoin_network());
-    info!("Local node id: {local_node_id:?}");
-    info!("Local npub: {:?}", local_node_id.npub());
+    info!("Local node id: {local_node_id}");
     info!("Local npub as hex: {:?}", local_node_id.npub().to_hex());
 
     // set up nostr clients for existing identities
@@ -143,6 +173,33 @@ async fn main() {
     // set up application context
     let app =
         bcr_wdc_ebill_service::AppController::new(api_config, nostr_clients.clone(), db).await;
+
+    // create identity if it doesn't exist
+    if !app.identity_service.identity_exists().await {
+        info!("No identity found - creating from config");
+        app.identity_service
+            .create_identity(
+                IdentityType::Ident,
+                maincfg.appcfg.identity_config.name.clone(),
+                Some(maincfg.appcfg.identity_config.email.clone()),
+                OptionalPostalAddress {
+                    country: Some(maincfg.appcfg.identity_config.country.clone()),
+                    city: Some(maincfg.appcfg.identity_config.city.clone()),
+                    zip: Some(maincfg.appcfg.identity_config.zip.clone()),
+                    address: Some(maincfg.appcfg.identity_config.address.clone()),
+                },
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Timestamp::now(),
+            )
+            .await
+            .expect("Failed to create identity");
+    }
+
     let router = bcr_wdc_ebill_service::routes(app.clone());
 
     // run jobs in background
