@@ -25,6 +25,9 @@ run-ens-service:
 run-ebill-service:
     EBILL_MNEMONIC="abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about" RUST_LOG=debug EBILL_CONFIG_FILE=docker/ebill-service/config.toml cargo run --package bcr-wdc-ebill-service
 
+run-relay:
+    RUST_LOG=debug cargo run --package bcr-wdc-relay
+
 # to build docker containers
 build-docker-base-image:
     docker build --ssh default -t wildcat-auxiliary/base-image -f docker/base-image/Dockerfile .
@@ -38,4 +41,8 @@ build-docker-ens-service: build-docker-base-image
 build-docker-ebill-service: build-docker-base-image
     docker build -t wildcat/ebill-service -f docker/ebill-service/Dockerfile .
 
-build-docker-images: build-docker-eic-service build-docker-ens-service build-docker-ebill-service
+build-docker-relay: build-docker-base-image
+    docker build -t wildcat/relay -f docker/relay/Dockerfile .
+
+build-docker-images: build-docker-eic-service build-docker-ens-service build-docker-ebill-service build-docker-relay
+

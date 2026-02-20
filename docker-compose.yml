@@ -7,6 +7,18 @@ services:
     extends:
       file: common-services.yml
       service: ens-service
+  relay:
+    extends:
+      file: common-services.yml
+      service: relay
+    ports:
+      - "8080:8080"
+  postgres:
+    extends:
+      file: common-services.yml
+      service: postgres
+    ports:
+      - "5432:5432"
   surrealdb:
     extends:
       file: common-services.yml
