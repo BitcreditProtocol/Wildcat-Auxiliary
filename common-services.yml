@@ -33,6 +33,22 @@ services:
       start_period: 60s
       start_interval: 3s
 
+  relay:
+    image: wildcat/relay
+    pull_policy: never
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+      start_interval: 3s
+
   surrealdb:
     image: surrealdb/surrealdb:latest
     volumes:
@@ -45,6 +61,21 @@ services:
     healthcheck:
       test: [ "CMD", "/surreal", "is-ready" ]
       interval: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - ./.docker_data/postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
       retries: 5
 
   rproxy:
