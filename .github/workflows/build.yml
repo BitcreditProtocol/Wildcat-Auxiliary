@@ -116,6 +116,8 @@ jobs:
             dockerfile: docker/ens-service/Dockerfile
           - name: bcr-wdc-ebill-service
             dockerfile: docker/ebill-service/Dockerfile
+          - name: bcr-wdc-relay
+            dockerfile: docker/relay/Dockerfile
 
     steps:
     - name: Checkout code
