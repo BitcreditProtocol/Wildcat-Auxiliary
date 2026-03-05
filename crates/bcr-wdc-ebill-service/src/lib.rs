@@ -102,13 +102,13 @@ pub struct AppController {
 impl AppController {
     pub async fn new(
         cfg: bcr_ebill_api::Config,
-        nostr_clients: Vec<Arc<NostrClient>>,
+        nostr_client: Arc<NostrClient>,
         db: bcr_ebill_api::DbContext,
     ) -> Self {
         let push_service = Arc::new(PushService::new());
         let email_client = Arc::new(EmailClient::new());
         let notification_service = create_transport_service(
-            nostr_clients,
+            nostr_client,
             db.clone(),
             email_client.clone(),
             cfg.nostr_config.relays.to_owned(),
