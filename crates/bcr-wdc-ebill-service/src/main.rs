@@ -97,10 +97,11 @@ async fn main() {
                 .disable_mandatory_email_confirmations,
         },
         bitcoin_network: maincfg.appcfg.bitcoin_network.clone(),
-        esplora_base_url: maincfg.appcfg.esplora_base_url.clone(),
+        esplora_base_urls: vec![maincfg.appcfg.esplora_base_url.clone()],
         nostr_config: NostrConfig {
             relays: maincfg.appcfg.nostr_cfg.relays.clone(),
             only_known_contacts: maincfg.appcfg.nostr_cfg.only_known_contacts,
+            max_relays: Some(50),
         },
         mint_config: MintConfig {
             default_mint_url: maincfg.appcfg.mint_config.default_mint_url.clone(),
@@ -161,18 +162,18 @@ async fn main() {
     info!("Local npub as hex: {:?}", local_node_id.npub().to_hex());
 
     // set up nostr clients for existing identities
-    let nostr_clients = create_nostr_clients(
+    let nostr_client = create_nostr_clients(
         &api_config,
         db.identity_store.clone(),
         db.company_store.clone(),
+        db.nostr_contact_store.clone(),
     )
     .await
     .expect("Failed to create nostr clients");
 
     let db_clone = db.clone();
     // set up application context
-    let app =
-        bcr_wdc_ebill_service::AppController::new(api_config, nostr_clients.clone(), db).await;
+    let app = bcr_wdc_ebill_service::AppController::new(api_config, nostr_client.clone(), db).await;
 
     // create identity if it doesn't exist
     if !app.identity_service.identity_exists().await {
@@ -215,7 +216,7 @@ async fn main() {
 
     // set up nostr event consumer
     let nostr_consumer = create_nostr_consumer(
-        nostr_clients.clone(),
+        nostr_client.clone(),
         app.contact_service.clone(),
         app.push_service.clone(),
         std::sync::Arc::new(ChainKeyService::new(
@@ -258,10 +259,8 @@ async fn main() {
             }
 
             // unsubscribe all, so we re-subscribe again on re-connect
-            for nostr_client in &nostr_clients {
-                if let Ok(cl) = nostr_client.client().await {
-                    cl.unsubscribe_all().await;
-                }
+            if let Ok(cl) = nostr_client.client().await {
+                cl.unsubscribe_all().await;
             }
         }
     });
