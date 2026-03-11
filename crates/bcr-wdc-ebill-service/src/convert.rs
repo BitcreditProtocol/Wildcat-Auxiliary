@@ -136,12 +136,11 @@ fn lightbillidentparticipantwithaddress_ebill2wire(
     }
 }
 
-fn lightbillidentparticipant_ebill2wire(
-    input: ebill_contact::LightBillIdentParticipant,
-) -> wire_bill::LightBillIdentParticipant {
-    wire_bill::LightBillIdentParticipant {
-        t: contacttype_ebill2wire(input.t),
-        name: input.name.to_string(),
+fn lightbillsignatory_ebill2wire(
+    input: ebill_contact::LightBillSignatory,
+) -> wire_bill::LightBillSignatory {
+    wire_bill::LightBillSignatory {
+        name: input.name.map(|n| n.to_string()),
         node_id: input.node_id,
     }
 }
@@ -170,7 +169,7 @@ fn lightbillparticipant_ebill2wire(
 fn lightsignedby_ebill2wire(input: ebill_bill::LightSignedBy) -> wire_bill::LightSignedBy {
     wire_bill::LightSignedBy {
         data: lightbillparticipant_ebill2wire(input.data),
-        signatory: input.signatory.map(lightbillidentparticipant_ebill2wire),
+        signatory: input.signatory.map(lightbillsignatory_ebill2wire),
     }
 }
 
