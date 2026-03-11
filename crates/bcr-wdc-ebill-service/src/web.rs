@@ -295,8 +295,18 @@ pub async fn get_bills(
     State(ctrl): State<AppController>,
 ) -> Result<Json<wire_bill::BillsResponse<wire_bill::BitcreditBill>>> {
     tracing::debug!("Received get bills request");
-    let identity = ctrl.identity_service.get_identity().await?;
-    let bills = ctrl.bill_service.get_bills(&identity.node_id).await?;
+    let identity = ctrl.identity_service.get_full_identity().await?;
+    let bills = ctrl
+        .bill_service
+        .get_bills(
+            &bcr_ebill_core::protocol::blockchain::bill::participant::BillParticipant::Ident(
+                bcr_ebill_core::protocol::blockchain::bill::participant::BillIdentParticipant::new(
+                    identity.identity,
+                )?,
+            ),
+            &identity.key_pair,
+        )
+        .await?;
     let wbills = bills
         .into_iter()
         .map(convert::bitcreditbill_ebill2wire)
@@ -311,10 +321,20 @@ pub async fn get_bill_detail(
 ) -> Result<Json<wire_bill::BitcreditBill>> {
     tracing::debug!("Received get bill detail request");
     let current_timestamp = Timestamp::now();
-    let identity = ctrl.identity_service.get_identity().await?;
+    let identity = ctrl.identity_service.get_full_identity().await?;
     let bill_detail = ctrl
         .bill_service
-        .get_detail(&bill_id, &identity, &identity.node_id, current_timestamp)
+        .get_detail(
+            &bill_id,
+            &identity.identity,
+            &bcr_ebill_core::protocol::blockchain::bill::participant::BillParticipant::Ident(
+                bcr_ebill_core::protocol::blockchain::bill::participant::BillIdentParticipant::new(
+                    identity.identity.clone(),
+                )?,
+            ),
+            &identity.key_pair,
+            current_timestamp,
+        )
         .await?;
     let wbill = convert::bitcreditbill_ebill2wire(bill_detail)?;
     Ok(Json(wbill))
@@ -327,10 +347,20 @@ pub async fn get_bill_payment_status(
 ) -> Result<Json<SimplifiedBillPaymentStatus>> {
     tracing::debug!("Received get bill payment status request");
     let current_timestamp = Timestamp::now();
-    let identity = ctrl.identity_service.get_identity().await?;
+    let identity = ctrl.identity_service.get_full_identity().await?;
     let bill_detail = ctrl
         .bill_service
-        .get_detail(&bill_id, &identity, &identity.node_id, current_timestamp)
+        .get_detail(
+            &bill_id,
+            &identity.identity,
+            &bcr_ebill_core::protocol::blockchain::bill::participant::BillParticipant::Ident(
+                bcr_ebill_core::protocol::blockchain::bill::participant::BillIdentParticipant::new(
+                    identity.identity.clone(),
+                )?,
+            ),
+            &identity.key_pair,
+            current_timestamp,
+        )
         .await?;
     let payment_status = bill_detail.status.payment;
     let payment_details = match bill_detail.current_waiting_state {
@@ -351,13 +381,23 @@ pub async fn get_bill_endorsements(
     State(ctrl): State<AppController>,
     Path(bill_id): Path<BillId>,
 ) -> Result<Json<Vec<wire_bill::Endorsement>>> {
-    tracing::debug!("Received get bill detail request");
+    tracing::debug!("Received get bill endorsements request");
 
     let now = Timestamp::now();
-    let identity = ctrl.identity_service.get_identity().await?;
+    let identity = ctrl.identity_service.get_full_identity().await?;
     let endorsements = ctrl
         .bill_service
-        .get_endorsements(&bill_id, &identity, &identity.node_id, now)
+        .get_endorsements(
+            &bill_id,
+            &identity.identity,
+            &bcr_ebill_core::protocol::blockchain::bill::participant::BillParticipant::Ident(
+                bcr_ebill_core::protocol::blockchain::bill::participant::BillIdentParticipant::new(
+                    identity.identity.clone(),
+                )?,
+            ),
+            &identity.key_pair,
+            now,
+        )
         .await?;
     Ok(Json(
         endorsements
@@ -374,11 +414,21 @@ pub async fn get_bill_attachment(
 ) -> Result<impl IntoResponse> {
     tracing::debug!("Received get bill attachment request");
     let current_timestamp = Timestamp::now();
-    let identity = ctrl.identity_service.get_identity().await?;
+    let identity = ctrl.identity_service.get_full_identity().await?;
     // get bill
     let bill = ctrl
         .bill_service
-        .get_detail(&bill_id, &identity, &identity.node_id, current_timestamp)
+        .get_detail(
+            &bill_id,
+            &identity.identity,
+            &bcr_ebill_core::protocol::blockchain::bill::participant::BillParticipant::Ident(
+                bcr_ebill_core::protocol::blockchain::bill::participant::BillIdentParticipant::new(
+                    identity.identity.clone(),
+                )?,
+            ),
+            &identity.key_pair,
+            current_timestamp,
+        )
         .await?;
 
     // check if this file even exists on the bill
