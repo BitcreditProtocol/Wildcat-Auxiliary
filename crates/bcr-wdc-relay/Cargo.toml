@@ -14,7 +14,7 @@ clap = { version = "4.5.39", features = ["derive", "env"] }
 deadpool-postgres = "0.14"
 nostr = "0.44"
 nostr-relay-builder = "0.44"
-nostr-postgres-db = { git = "https://github.com/BitcreditProtocol/nostr-postgres-db.git", rev = "a8dbc8e" }
+nostr-postgres-db = { git = "https://github.com/BitcreditProtocol/nostr-postgres-db.git", rev = "01a4cf9" }
 serde.workspace = true
 tokio.workspace = true
 tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"] }
