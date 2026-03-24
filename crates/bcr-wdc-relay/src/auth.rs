@@ -1,8 +1,8 @@
-/// This module contains Blossom auth related code even though we don't require any auth right
-/// now. The reason why I added it here is that some operations (eg. mirror) already verify at
-/// least the signature part of files, which are communicated via auth related headers.
-/// At a later point (when the Blossom part of the Nostr SDK is ready) we probably want to replace
-/// this custom code with code from the SDK.
+/// This module contains Blossom-style request header parsing even though we do not require
+/// service-level authentication right now. It is currently used to extract request metadata such
+/// as expiration and the expected blob hash (`x` tag), which `/mirror` uses to compare the caller-
+/// supplied hash against the hash of the downloaded blob. At a later point (when the Blossom part
+/// of the Nostr SDK is ready) we probably want to replace this custom code with code from the SDK.
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},

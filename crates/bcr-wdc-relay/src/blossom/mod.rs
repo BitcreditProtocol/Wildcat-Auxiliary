@@ -18,6 +18,7 @@ use nostr::{
     types::Url,
 };
 use serde::{Deserialize, Serialize};
+use std::net::IpAddr;
 use tracing::{error, info};
 
 use crate::AppState;
@@ -36,7 +37,16 @@ pub struct MirrorRequest {
 
 /// Validates that a source URL is safe for server-side requests.
 /// Returns an error message if the URL is not allowed.
-fn validate_source_url(url: &Url) -> Option<&'static str> {
+fn is_disallowed_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ipv4) => ipv4.is_loopback() || ipv4.is_private() || ipv4.is_link_local(),
+        IpAddr::V6(ipv6) => {
+            ipv6.is_loopback() || ipv6.is_unique_local() || ipv6.is_unicast_link_local()
+        }
+    }
+}
+
+async fn validate_source_url(url: &Url) -> Option<&'static str> {
     // HTTPS-only check
     if url.scheme() != "https" {
         return Some("Only HTTPS URLs are allowed");
@@ -51,15 +61,15 @@ fn validate_source_url(url: &Url) -> Option<&'static str> {
         return Some("Invalid IP address");
     }
 
-    if let Ok(ip) = host.parse::<std::net::IpAddr>()
-        && match ip {
-            std::net::IpAddr::V4(ipv4) => {
-                ipv4.is_loopback() || ipv4.is_private() || ipv4.is_link_local()
-            }
-            std::net::IpAddr::V6(ipv6) => {
-                ipv6.is_loopback() || ipv6.is_unique_local() || ipv6.is_unicast_link_local()
-            }
-        }
+    if let Ok(ip) = host.parse::<IpAddr>()
+        && is_disallowed_ip(ip)
+    {
+        return Some("Invalid IP address");
+    }
+
+    let port = url.port_or_known_default().unwrap_or(443);
+    if let Ok(addrs) = tokio::net::lookup_host((host, port)).await
+        && addrs.into_iter().any(|addr| is_disallowed_ip(addr.ip()))
     {
         return Some("Invalid IP address");
     }
@@ -204,10 +214,11 @@ pub async fn handle_list(Path(_pub_key): Path<String>) -> impl IntoResponse {
     (StatusCode::NOT_IMPLEMENTED, "NOT_IMPLEMENTED")
 }
 
-/// Handles the /mirror endpoint - fetches a blob from a remote source,
-/// verifies its SHA-256 hash against the auth token's x tag, and stores it.
-/// Returns 400 for hash mismatch, 401/403 for auth failures, 404 if source not accessible,
-/// 413 if source too large, 500 for internal errors.
+/// Handles the /mirror endpoint by fetching a blob from a remote source,
+/// comparing its SHA-256 hash against the caller-provided `x` tag, and storing it.
+/// Returns 400 for malformed request metadata or hash mismatch, 401 for expired tokens,
+/// 404 if the source is not accessible, 413 if the source is too large, and 500 for
+/// internal errors.
 pub async fn handle_mirror(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -216,7 +227,7 @@ pub async fn handle_mirror(
     info!("Mirror request for source: {}", request.source);
 
     // Validate source URL for SSRF protection
-    if let Some(reason) = validate_source_url(&request.source) {
+    if let Some(reason) = validate_source_url(&request.source).await {
         error!("Source URL validation failed: {}", reason);
         return mirror_error_response(StatusCode::BAD_REQUEST, reason);
     }
@@ -529,13 +540,8 @@ mod tests {
 
     /// Test helper to create a valid encrypted blob (starts with valid secp256k1 pubkey)
     fn create_test_encrypted_blob(size: usize) -> Vec<u8> {
-        // Create a valid uncompressed secp256k1 public key (65 bytes)
-        // Format: 0x04 || x-coordinate (32 bytes) || y-coordinate (32 bytes)
         let mut blob = vec![0u8; size.max(65)];
-        // Uncompressed pubkey marker
         blob[0] = 0x04;
-        // Fill with valid-looking values (these aren't curve points but the parser may not validate)
-        // Using a known valid key format
         let valid_pubkey = [
             0x04u8, 0x79, 0xBE, 0x66, 0x7E, 0xF9, 0xDC, 0xBB, 0xAC, 0x55, 0xA0, 0x62, 0x95, 0xCE,
             0x87, 0x0B, 0x07, 0x02, 0x9B, 0xFC, 0xDB, 0x2D, 0xCE, 0x28, 0xD9, 0x59, 0xF2, 0x81,
@@ -561,8 +567,6 @@ mod tests {
             http_client: Arc::new(reqwest::Client::new()),
         }
     }
-
-    // ============== HEAD /{hash} Tests ==============
 
     #[tokio::test]
     async fn test_head_file_exists() {
@@ -618,8 +622,6 @@ mod tests {
         let response = response.into_response();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
-
-    // ============== HEAD /upload Tests ==============
 
     #[tokio::test]
     async fn test_head_upload_valid_preflight() {
@@ -684,9 +686,6 @@ mod tests {
         );
     }
 
-    // ============== PUT /mirror Tests ==============
-
-    /// Create a valid authorization token for testing
     fn create_auth_token(keys: &Keys, hash: &Sha256Hash, kind: u16, t_tag: &str) -> String {
         let event = EventBuilder::new(Kind::from(kind), "mirror request")
             .tag(nostr::Tag::parse(["t", t_tag]).unwrap())
@@ -768,6 +767,34 @@ mod tests {
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
 
+    #[test]
+    fn test_is_disallowed_ip_rejects_private_loopback_and_link_local() {
+        assert!(is_disallowed_ip(IpAddr::V4(std::net::Ipv4Addr::LOCALHOST)));
+        assert!(is_disallowed_ip(IpAddr::V4(std::net::Ipv4Addr::new(
+            192, 168, 1, 10,
+        ))));
+        assert!(is_disallowed_ip(IpAddr::V4(std::net::Ipv4Addr::new(
+            169, 254, 1, 10,
+        ))));
+        assert!(is_disallowed_ip(IpAddr::V6(std::net::Ipv6Addr::LOCALHOST)));
+        assert!(is_disallowed_ip(IpAddr::V6(std::net::Ipv6Addr::new(
+            0xfc00, 0, 0, 0, 0, 0, 0, 1,
+        ))));
+        assert!(is_disallowed_ip(IpAddr::V6(std::net::Ipv6Addr::new(
+            0xfe80, 0, 0, 0, 0, 0, 0, 1,
+        ))));
+    }
+
+    #[test]
+    fn test_is_disallowed_ip_allows_public_addresses() {
+        assert!(!is_disallowed_ip(IpAddr::V4(std::net::Ipv4Addr::new(
+            88, 99, 122, 172,
+        ))));
+        assert!(!is_disallowed_ip(IpAddr::V6(std::net::Ipv6Addr::new(
+            0x2606, 0x4700, 0, 0, 0, 0, 0, 0x1111,
+        ))));
+    }
+
     #[tokio::test]
     async fn test_mirror_missing_auth_header() {
         let state = create_test_state();
@@ -831,66 +858,5 @@ mod tests {
 
         let response = response.into_response();
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-    }
-
-    // ============== Documentation Tests ==============
-
-    /// This test verifies the documentation of the MirrorRequest payload
-    #[test]
-    fn test_mirror_request_json_shape() {
-        // The /mirror endpoint expects a JSON payload like:
-        // {"source": "https://..."}
-        let request = MirrorRequest {
-            source: Url::parse("https://example.com/blob.bin").unwrap(),
-        };
-
-        let json = serde_json::to_string(&request).unwrap();
-        assert!(json.contains("\"source\""));
-        assert!(json.contains("https://example.com/blob.bin"));
-    }
-
-    /// This test documents the auth token structure
-    #[test]
-    fn test_auth_token_documentation() {
-        // Authorization header format: "Authorization: Nostr <base64-token>"
-        // The base64-token is a JSON-encoded Nostr Event with:
-        // - kind: 24242 (Blossom upload)
-        // - tags: ["t", "upload"] and ["x", "<sha256>"]
-        let keys = Keys::generate();
-        let hash = Sha256Hash::all_zeros();
-
-        let auth_header = create_auth_token(&keys, &hash, 24242, "upload");
-
-        // Verify the format
-        assert!(auth_header.starts_with("Nostr "));
-        let parts: Vec<&str> = auth_header.split_whitespace().collect();
-        assert_eq!(parts.len(), 2);
-    }
-
-    /// This test documents the expected failure classes
-    #[test]
-    fn test_failure_classes_documentation() {
-        // 400 Bad Request:
-        // - Hash mismatch: Blob hash doesn't match the x tag in auth token
-        // - Invalid source URL: Not HTTPS, localhost, or private IP
-        // - Missing x tag in auth token
-        // - Malformed Authorization header
-
-        // 401 Unauthorized:
-        // - Expired auth token
-
-        // 403 Forbidden:
-        // - Invalid signature on auth token
-        // - Wrong kind in auth token (not 24242)
-
-        // 404 Not Found:
-        // - Source blob not accessible (fetch failed)
-        // - File not found when trying to GET/HEAD
-
-        // 413 Payload Too Large:
-        // - Source blob exceeds max_file_size_bytes
-        // - Upload exceeds max_file_size_bytes
-
-        // This is documentation only - the actual behavior is tested in other test cases
     }
 }
