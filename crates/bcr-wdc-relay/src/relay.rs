@@ -92,6 +92,8 @@ pub struct RelayConfig {
     pub chain_rate_limit_window: usize,
     #[arg(default_value_t = 10_000_000, long, env = "MAX_FILE_SIZE_BYTES")]
     pub max_file_size_bytes: usize,
+    #[arg(default_value_t = 30, long, env = "MIRROR_TIMEOUT_SECONDS")]
+    pub mirror_timeout_seconds: u64,
 }
 
 impl RelayConfig {

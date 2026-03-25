@@ -1,3 +1,4 @@
+mod auth;
 mod blossom;
 mod db;
 mod rate_limit;
@@ -139,6 +140,7 @@ struct AppState {
     pub relay: LocalRelay,
     pub cfg: AppConfig,
     pub file_store: Arc<dyn FileStoreApi>,
+    pub http_client: Arc<reqwest::Client>,
 }
 
 impl AppState {
@@ -148,6 +150,14 @@ impl AppState {
         db.init().await?;
         let store = Arc::new(db);
 
+        let http_client = Arc::new(
+            reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(
+                    config.mirror_timeout_seconds,
+                ))
+                .build()?,
+        );
+
         Ok(Self {
             relay: relay::init(config, pool).await?,
             cfg: AppConfig {
@@ -155,6 +165,7 @@ impl AppState {
                 max_file_size_bytes: config.max_file_size_bytes,
             },
             file_store: store.clone(),
+            http_client,
         })
     }
 }
