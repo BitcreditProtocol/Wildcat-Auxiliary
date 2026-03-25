@@ -100,6 +100,7 @@ async fn main() {
         esplora_base_urls: vec![maincfg.appcfg.esplora_base_url.clone()],
         nostr_config: NostrConfig {
             relays: maincfg.appcfg.nostr_cfg.relays.clone(),
+            blossom_servers: maincfg.appcfg.nostr_cfg.blossom_servers.clone(),
             only_known_contacts: maincfg.appcfg.nostr_cfg.only_known_contacts,
             max_relays: Some(50),
         },

@@ -21,7 +21,7 @@ use bcr_ebill_core::{
         City, Country, Currency, Date, Email, Identification, Name, ProtocolValidationError,
         SchnorrSignature, Sha256Hash, Timestamp,
         blockchain::bill::{
-            BillBlock, BillBlockchain,
+            BillBlock, BillBlockchain, BillOpCode,
             chain::{
                 BillBlockPlaintextWrapper, get_bill_parties_from_chain_with_plaintext,
                 get_endorsees_from_chain_with_plaintext,
@@ -592,9 +592,9 @@ pub async fn bill_bitcoin_key(
 ) -> Result<Json<wire_bill::BillCombinedBitcoinKey>> {
     tracing::debug!("Received get bill bitcoin private key request");
     let IdentityWithAll { identity, key_pair } = ctrl.identity_service.get_full_identity().await?;
-    let combined_key = ctrl
+    let combined_keys = ctrl
         .bill_service
-        .get_combined_bitcoin_key_for_bill(
+        .get_combined_bitcoin_keys_for_bill(
             &bill_id,
             &bcr_ebill_core::protocol::blockchain::bill::participant::BillParticipant::Ident(
                 bcr_ebill_core::protocol::blockchain::bill::participant::BillIdentParticipant::new(
@@ -604,7 +604,12 @@ pub async fn bill_bitcoin_key(
             &key_pair,
         )
         .await?;
+    // we're only interested in the request to pay descriptor
+    let req_to_pay_key = combined_keys
+        .into_iter()
+        .find(|key| matches!(key.payment_op, BillOpCode::RequestToPay))
+        .ok_or_else(|| bcr_ebill_api::service::bill_service::Error::NotFound)?;
     Ok(Json(convert::billcombinedbitcoinkey_ebill2wire(
-        combined_key,
+        req_to_pay_key,
     )))
 }
