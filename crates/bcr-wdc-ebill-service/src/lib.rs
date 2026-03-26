@@ -46,6 +46,7 @@ pub struct AppConfig {
 pub struct NostrConfig {
     pub only_known_contacts: bool,
     pub relays: Vec<url::Url>,
+    pub blossom_servers: Vec<url::Url>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]

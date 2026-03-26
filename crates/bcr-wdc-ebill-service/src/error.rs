@@ -146,6 +146,9 @@ impl axum::response::IntoResponse for BillServiceError {
             bill_service::Error::Protocol(protocol_error) => {
                 ProtocolError(protocol_error).into_response()
             }
+            bill_service::Error::Json(_) => {
+                (StatusCode::BAD_REQUEST, self.0.to_string()).into_response()
+            }
         }
     }
 }

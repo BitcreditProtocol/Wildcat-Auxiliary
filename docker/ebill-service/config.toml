@@ -8,6 +8,7 @@ database = "ebill"
 
 [appcfg.nostr_cfg]
 relays = ["wss://relay.wildcat0.clowder-dev.minibill.tech"]
+blossom_servers = ["https://relay.wildcat0.clowder-dev.minibill.tech"]
 only_known_contacts = false
 
 [appcfg.mint_config]

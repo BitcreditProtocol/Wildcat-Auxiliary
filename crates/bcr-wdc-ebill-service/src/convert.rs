@@ -378,8 +378,6 @@ pub(crate) fn billwaitingstatepaymentdata_ebill2wire(
     wire_bill::BillWaitingStatePaymentData {
         address_to_pay: input.address_to_pay.assume_checked().to_string(),
         currency: input.sum.currency().code().to_owned(),
-        link_to_pay: input.link_to_pay,
-        mempool_link_for_address_to_pay: input.mempool_link_for_address_to_pay,
         time_of_request: input.time_of_request.inner(),
         sum: input.sum.as_sat_string(),
         confirmations: input.confirmations,
