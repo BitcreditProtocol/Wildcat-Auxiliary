@@ -46,6 +46,7 @@ async fn main() {
                 .separator("__")
                 .list_separator(",")
                 .with_list_parse_key("appcfg.nostr_cfg.relays")
+                .with_list_parse_key("appcfg.nostr_cfg.blossom_servers")
                 .try_parsing(true),
         )
         .build()
