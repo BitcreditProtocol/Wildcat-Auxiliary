@@ -27,12 +27,11 @@ use crate::AppState;
 ///
 /// # Example
 /// ```json
-/// {"source": "https://example.com/blob.bin"}
+/// {"url": "https://example.com/blob.bin"}
 /// ```
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MirrorRequest {
-    /// The source URL to fetch the blob from
-    pub source: Url,
+    pub url: Url,
 }
 
 /// Validates that a source URL is safe for server-side requests.
@@ -224,10 +223,10 @@ pub async fn handle_mirror(
     headers: HeaderMap,
     Json(request): Json<MirrorRequest>,
 ) -> impl IntoResponse {
-    info!("Mirror request for source: {}", request.source);
+    info!("Mirror request for source: {}", request.url);
 
     // Validate source URL for SSRF protection
-    if let Some(reason) = validate_source_url(&request.source).await {
+    if let Some(reason) = validate_source_url(&request.url).await {
         error!("Source URL validation failed: {}", reason);
         return mirror_error_response(StatusCode::BAD_REQUEST, reason);
     }
@@ -283,7 +282,7 @@ pub async fn handle_mirror(
         }
     }
 
-    let response = match state.http_client.get(request.source.as_str()).send().await {
+    let response = match state.http_client.get(request.url.as_str()).send().await {
         Ok(resp) => resp,
         Err(e) => {
             error!("Failed to fetch from source: {}", e);
@@ -710,7 +709,7 @@ mod tests {
 
         // Try with HTTP (not HTTPS)
         let request = MirrorRequest {
-            source: Url::parse("http://example.com/file.bin").unwrap(),
+            url: Url::parse("http://example.com/file.bin").unwrap(),
         };
 
         let response = handle_mirror(State(state), headers, Json(request)).await;
@@ -737,7 +736,7 @@ mod tests {
 
         // Try with localhost
         let request = MirrorRequest {
-            source: Url::parse("https://localhost/file.bin").unwrap(),
+            url: Url::parse("https://localhost/file.bin").unwrap(),
         };
 
         let response = handle_mirror(State(state), headers, Json(request)).await;
@@ -758,7 +757,7 @@ mod tests {
 
         // Try with private IP
         let request = MirrorRequest {
-            source: Url::parse("https://192.168.1.1/file.bin").unwrap(),
+            url: Url::parse("https://192.168.1.1/file.bin").unwrap(),
         };
 
         let response = handle_mirror(State(state), headers, Json(request)).await;
@@ -804,7 +803,7 @@ mod tests {
         let headers = HeaderMap::new();
 
         let request = MirrorRequest {
-            source: Url::parse("https://example.com/file.bin").unwrap(),
+            url: Url::parse("https://example.com/file.bin").unwrap(),
         };
 
         let response = handle_mirror(State(state), headers, Json(request)).await;
@@ -823,7 +822,7 @@ mod tests {
         headers.insert("Authorization", "Bearer invalid_token".parse().unwrap());
 
         let request = MirrorRequest {
-            source: Url::parse("https://example.com/file.bin").unwrap(),
+            url: Url::parse("https://example.com/file.bin").unwrap(),
         };
 
         let response = handle_mirror(State(state), headers, Json(request)).await;
@@ -851,7 +850,7 @@ mod tests {
         headers.insert("Authorization", auth_header.parse().unwrap());
 
         let request = MirrorRequest {
-            source: Url::parse("https://example.com/file.bin").unwrap(),
+            url: Url::parse("https://example.com/file.bin").unwrap(),
         };
 
         let response = handle_mirror(State(state), headers, Json(request)).await;
