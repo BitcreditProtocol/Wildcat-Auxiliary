@@ -20,17 +20,24 @@ use bcr_ebill_core::{
     protocol::{
         City, Country, Currency, Date, Email, Identification, Name, ProtocolValidationError,
         SchnorrSignature, Sha256Hash, Timestamp,
-        blockchain::bill::{
-            BillBlock, BillBlockchain, BillOpCode,
-            chain::{
-                BillBlockPlaintextWrapper, get_bill_parties_from_chain_with_plaintext,
-                get_endorsees_from_chain_with_plaintext,
+        blockchain::{
+            Block, Blockchain,
+            bill::{
+                BillBlock, BillBlockchain,
+                chain::{
+                    BillBlockPlaintextWrapper, get_bill_parties_from_chain_with_plaintext,
+                    get_endorsees_from_chain_with_plaintext,
+                },
             },
         },
         crypto::{self, BcrKeys},
     },
 };
-use bitcoin::{base58, secp256k1::SecretKey};
+use bitcoin::{
+    base58,
+    hashes::{Hash, sha256::Hash as HashSha256},
+    secp256k1::SecretKey,
+};
 use futures::StreamExt;
 use reqwest::StatusCode;
 use uuid::Uuid;
@@ -187,7 +194,8 @@ pub async fn validate_and_decrypt_shared_bill(
 
     // create result
     Ok(Json(wire_quotes::BillInfo {
-        id: bill_data.id,
+        id: BillId::from_str(&bill_data.id.to_string())
+            .map_err(|_| Error::ProtocolValidation(ProtocolValidationError::InvalidBillId))?,
         drawee: convert::billidentparticipant_ebill2wire(core_drawee),
         drawer: convert::billidentparticipant_ebill2wire(core_drawer),
         payee: convert::billparticipant_ebill2wire(core_payee),
@@ -555,22 +563,47 @@ async fn do_get_encrypted_bill_file_from_request_to_mint(
 }
 
 #[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl))]
+pub async fn prepare_request_to_pay_bill(
+    State(ctrl): State<AppController>,
+    Json(prepare_request_to_pay_bill_payload): Json<
+        wire_bill::PrepareRequestToPayBitcreditBillPayload,
+    >,
+) -> Result<Json<wire_bill::PrepareRequestToPayBitcreditBillResponse>> {
+    tracing::debug!("Received prepare request to pay bill request");
+    let address_derivation_metadata = ctrl
+        .bill_service
+        .get_address_derivation_metadata_for_payment_request(
+            &prepare_request_to_pay_bill_payload.bill_id,
+        )
+        .await?;
+
+    let previous_hash =
+        HashSha256::from_byte_array(address_derivation_metadata.previous_hash.decode_to_array());
+    Ok(Json(wire_bill::PrepareRequestToPayBitcreditBillResponse {
+        block_id: address_derivation_metadata.block_id.inner(),
+        previous_block_hash: previous_hash,
+    }))
+}
+
+#[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl))]
 pub async fn request_to_pay_bill(
     State(ctrl): State<AppController>,
     Json(request_to_pay_bill_payload): Json<wire_bill::RequestToPayBitcreditBillPayload>,
-) -> Result<Json<SuccessResponse>> {
+) -> Result<Json<wire_bill::RequestToPayBitcreditBillResponse>> {
     tracing::debug!("Received request to pay bill request");
 
     let current_timestamp = Timestamp::now();
     let IdentityWithAll { identity, key_pair } = ctrl.identity_service.get_full_identity().await?;
 
     let deadline_ts = Timestamp::from(request_to_pay_bill_payload.deadline);
-    ctrl.bill_service
+    let chain = ctrl
+        .bill_service
         .execute_bill_action(
             &request_to_pay_bill_payload.bill_id,
             bcr_ebill_core::protocol::blockchain::bill::BillAction::RequestToPay(
                 Currency::sat(),
                 deadline_ts,
+                Some(request_to_pay_bill_payload.payment_address),
             ),
             &bcr_ebill_core::protocol::blockchain::bill::participant::BillParticipant::Ident(
                 bcr_ebill_core::protocol::blockchain::bill::participant::BillIdentParticipant::new(
@@ -581,35 +614,19 @@ pub async fn request_to_pay_bill(
             current_timestamp,
         )
         .await?;
-
-    Ok(Json(SuccessResponse::default()))
-}
-
-#[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl))]
-pub async fn bill_bitcoin_key(
-    State(ctrl): State<AppController>,
-    Path(bill_id): Path<BillId>,
-) -> Result<Json<wire_bill::BillCombinedBitcoinKey>> {
-    tracing::debug!("Received get bill bitcoin private key request");
-    let IdentityWithAll { identity, key_pair } = ctrl.identity_service.get_full_identity().await?;
-    let combined_keys = ctrl
+    let latest_block = chain.get_latest_block();
+    let block_id = latest_block.id().inner();
+    let previous_block_hash =
+        HashSha256::from_byte_array(latest_block.previous_hash().decode_to_array());
+    let bill_keys = ctrl
         .bill_service
-        .get_combined_bitcoin_keys_for_bill(
-            &bill_id,
-            &bcr_ebill_core::protocol::blockchain::bill::participant::BillParticipant::Ident(
-                bcr_ebill_core::protocol::blockchain::bill::participant::BillIdentParticipant::new(
-                    identity,
-                )?,
-            ),
-            &key_pair,
-        )
+        .get_bill_keys(&request_to_pay_bill_payload.bill_id)
         .await?;
-    // we're only interested in the request to pay descriptor
-    let req_to_pay_key = combined_keys
-        .into_iter()
-        .find(|key| matches!(key.payment_op, BillOpCode::RequestToPay))
-        .ok_or_else(|| bcr_ebill_api::service::bill_service::Error::NotFound)?;
-    Ok(Json(convert::billcombinedbitcoinkey_ebill2wire(
-        req_to_pay_key,
-    )))
+    let bill_private_key = bill_keys.get_private_key();
+
+    Ok(Json(wire_bill::RequestToPayBitcreditBillResponse {
+        block_id,
+        previous_block_hash,
+        bill_private_key,
+    }))
 }
