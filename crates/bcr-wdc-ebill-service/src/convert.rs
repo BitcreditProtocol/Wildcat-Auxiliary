@@ -182,14 +182,6 @@ pub(crate) fn endorsement_ebill2wire(input: ebill_bill::Endorsement) -> wire_bil
     }
 }
 
-pub(crate) fn billcombinedbitcoinkey_ebill2wire(
-    input: ebill_bill::BillCombinedBitcoinKey,
-) -> wire_bill::BillCombinedBitcoinKey {
-    wire_bill::BillCombinedBitcoinKey {
-        private_descriptor: input.private_descriptor,
-    }
-}
-
 pub(crate) fn notificationtype_ebill2wire(
     input: ebill_notification::NotificationType,
 ) -> wire_bill::NotificationType {

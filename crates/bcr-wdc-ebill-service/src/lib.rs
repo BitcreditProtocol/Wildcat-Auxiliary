@@ -196,8 +196,8 @@ pub fn routes(ctrl: AppController) -> Router {
             put(web::request_to_pay_bill),
         )
         .route(
-            "/v1/admin/bill/bitcoin_key/{bill_id}",
-            get(web::bill_bitcoin_key),
+            "/v1/admin/bill/prepare_request_to_pay",
+            post(web::prepare_request_to_pay_bill),
         )
         .route(
             "/v1/admin/bill/validate_and_decrypt_shared_bill",
