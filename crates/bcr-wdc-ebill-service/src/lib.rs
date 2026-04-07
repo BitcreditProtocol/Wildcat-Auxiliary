@@ -204,7 +204,7 @@ pub fn routes(ctrl: AppController) -> Router {
             post(web::validate_and_decrypt_shared_bill),
         )
         .route(
-            "/v1/admin/ebill/get_file_from_request_to_mint",
+            "/v1/admin/bill/get_file_from_request_to_mint",
             get(web::get_encrypted_bill_file_from_request_to_mint),
         )
         .with_state(ctrl)
