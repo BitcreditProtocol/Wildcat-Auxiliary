@@ -8,8 +8,11 @@ use axum::{
 };
 use bcr_ebill_api::{
     external::{
-        bitcoin::BitcoinClient, court::CourtClient, email::EmailClient,
-        file_storage::FileStorageClient, mint::MintClient,
+        bitcoin::BitcoinClient,
+        court::CourtClient,
+        email::EmailClient,
+        file_storage::FileStorageClient,
+        mint::{MintClient, MintClientApi},
     },
     service::{
         bill_service::{BillService, BillServiceApi},
@@ -98,6 +101,7 @@ pub struct AppController {
     pub identity_service: Arc<dyn IdentityServiceApi>,
     pub notification_service: Arc<dyn TransportServiceApi>,
     pub push_service: Arc<dyn PushApi>,
+    pub mint_client: Arc<dyn MintClientApi>,
 }
 
 impl AppController {
@@ -108,12 +112,15 @@ impl AppController {
     ) -> Self {
         let push_service = Arc::new(PushService::new());
         let email_client = Arc::new(EmailClient::new());
+        let mint_client = Arc::new(MintClient::new());
+
         let notification_service = create_transport_service(
             nostr_client,
             db.clone(),
             email_client.clone(),
             cfg.nostr_config.relays.to_owned(),
             push_service.clone(),
+            mint_client.clone(),
         )
         .await
         .expect("Failed to create notification service");
@@ -122,6 +129,7 @@ impl AppController {
             db.contact_store.clone(),
             db.file_upload_store.clone(),
             file_upload_client.clone(),
+            db.file_reference_store.clone(),
             db.identity_store.clone(),
             db.company_store.clone(),
             db.nostr_contact_store.clone(),
@@ -136,6 +144,7 @@ impl AppController {
             db.identity_store.clone(),
             db.file_upload_store.clone(),
             file_upload_client.clone(),
+            db.file_reference_store.clone(),
             Arc::new(BitcoinClient::new()),
             notification_service.clone(),
             db.identity_chain_store.clone(),
@@ -143,7 +152,7 @@ impl AppController {
             db.contact_store.clone(),
             db.company_store.clone(),
             db.mint_store.clone(),
-            Arc::new(MintClient::new()),
+            mint_client.clone(),
             court_client.clone(),
             db.nostr_contact_store.clone(),
         ));
@@ -152,6 +161,7 @@ impl AppController {
             db.identity_store.clone(),
             db.file_upload_store.clone(),
             file_upload_client.clone(),
+            db.file_reference_store.clone(),
             db.identity_chain_store.clone(),
             notification_service.clone(),
             email_client.clone(),
@@ -164,6 +174,7 @@ impl AppController {
             identity_service: Arc::new(identity_service),
             notification_service,
             push_service,
+            mint_client,
         }
     }
 }

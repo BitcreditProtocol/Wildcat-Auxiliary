@@ -227,6 +227,7 @@ async fn main() {
             db_clone.identity_store.clone(),
         )),
         db_clone.clone(),
+        app.mint_client.clone(),
     )
     .await
     .expect("Failed to create Nostr consumer");
