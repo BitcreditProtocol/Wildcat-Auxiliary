@@ -92,10 +92,10 @@ async fn main() {
         },
         dev_mode_config: DevModeConfig {
             on: maincfg.appcfg.dev_mode_config.on,
-            disable_mandatory_email_confirmations: maincfg
+            mandatory_email_confirmations: maincfg
                 .appcfg
                 .dev_mode_config
-                .disable_mandatory_email_confirmations,
+                .mandatory_email_confirmations,
         },
         bitcoin_network: maincfg.appcfg.bitcoin_network.clone(),
         esplora_base_urls: vec![maincfg.appcfg.esplora_base_url.clone()],
