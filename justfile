@@ -28,6 +28,9 @@ run-ebill-service:
 run-relay:
     RUST_LOG=debug cargo run --package bcr-wdc-relay
 
+run-demo-faucet:
+    RUST_LOG=debug DEMO_FAUCET_CONFIG_FILE=docker/demo-faucet/config.toml cargo run --package bcr-wdc-demo-faucet
+
 # to build docker containers
 build-docker-base-image:
     docker build --ssh default -t wildcat-auxiliary/base-image -f docker/base-image/Dockerfile .
@@ -44,5 +47,8 @@ build-docker-ebill-service: build-docker-base-image
 build-docker-relay: build-docker-base-image
     docker build -t wildcat/relay -f docker/relay/Dockerfile .
 
-build-docker-images: build-docker-eic-service build-docker-ens-service build-docker-ebill-service build-docker-relay
+build-docker-demo-faucet: build-docker-base-image
+    docker build -t wildcat/demo-faucet -f docker/demo-faucet/Dockerfile .
+
+build-docker-images: build-docker-eic-service build-docker-ens-service build-docker-ebill-service build-docker-relay build-docker-demo-faucet
 

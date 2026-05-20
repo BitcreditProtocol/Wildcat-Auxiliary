@@ -1,0 +1,19 @@
+[package]
+name = "bcr-wdc-demo-faucet"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+
+[dependencies]
+bcr-common = {workspace = true}
+bitcoin = {workspace = true, features = ["serde"]}
+config.workspace = true
+chrono = {workspace = true}
+serde.workspace = true
+tokio = {workspace = true, features = ["signal", "time", "macros", "rt-multi-thread"]}
+tokio-util = {version = "0.7"}
+tracing = {workspace = true, features = ["log"]}
+tracing-log = {workspace = true}
+tracing-subscriber = {workspace = true, features = ["serde"]}
+url = {workspace = true}
