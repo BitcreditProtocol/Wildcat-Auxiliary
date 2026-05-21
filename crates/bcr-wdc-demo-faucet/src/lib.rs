@@ -119,16 +119,17 @@ pub async fn main_loop(
     Ok(())
 }
 
-// Act/360 helper to calculate discount
+// Act/360 helper to calculate discounted sum
 pub fn discount_sats(sum: u64, discount_percent: u64, maturity_date: NaiveDate) -> u64 {
     if discount_percent == 0 {
-        return 0;
+        return sum;
     }
+    let discount_percent = discount_percent.clamp(0, 99);
     let days = maturity_date
         .signed_duration_since(Utc::now().date_naive())
         .num_days()
         .clamp(1, 360) as u64;
-    sum * discount_percent * days / 100 / 360
+    sum - (sum * discount_percent * days / 100 / 360)
 }
 
 #[cfg(test)]
@@ -137,32 +138,38 @@ mod tests {
     use chrono::Duration;
 
     #[test]
-    fn returns_zero_when_discount_percent_is_zero() {
+    fn returns_sum_when_discount_percent_is_zero() {
         let maturity_date = Utc::now().date_naive() + Duration::days(180);
-        assert_eq!(discount_sats(100_000, 0, maturity_date), 0);
+        assert_eq!(discount_sats(100_000, 0, maturity_date), 100_000);
     }
 
     #[test]
     fn calculates_half_year_discount() {
         let maturity_date = Utc::now().date_naive() + Duration::days(180);
-        assert_eq!(discount_sats(100_000, 10, maturity_date), 5_000);
+        assert_eq!(discount_sats(100_000, 10, maturity_date), 95_000);
     }
 
     #[test]
     fn clamps_maturity_to_360_days() {
         let maturity_date = Utc::now().date_naive() + Duration::days(720);
-        assert_eq!(discount_sats(100_000, 10, maturity_date), 10_000);
+        assert_eq!(discount_sats(100_000, 10, maturity_date), 90_000);
     }
 
     #[test]
     fn clamps_past_maturity_to_one_day() {
         let maturity_date = Utc::now().date_naive() - Duration::days(30);
-        assert_eq!(discount_sats(360_000, 10, maturity_date), 100);
+        assert_eq!(discount_sats(360_000, 10, maturity_date), 359_900);
+    }
+
+    #[test]
+    fn clamps_maturity_and_percent() {
+        let maturity_date = Utc::now().date_naive() + Duration::days(720);
+        assert_eq!(discount_sats(360_000, 150, maturity_date), 3600);
     }
 
     #[test]
     fn one_day() {
         let maturity_date = Utc::now().date_naive() + Duration::days(1);
-        assert_eq!(discount_sats(360_000, 10, maturity_date), 100);
+        assert_eq!(discount_sats(360_000, 10, maturity_date), 359_900);
     }
 }
