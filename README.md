@@ -11,4 +11,5 @@ The project consists of the following crates:
 * `bcr-wdc-ens-service` - E-Bill Notification Sending Service
 * `bcr-wdc-shared` - Shared types and logic for the services in this repository
 * `bcr-wdc-relay` - A specialized Nostr relay implementation written in Rust for the Bitcredit application.
+* `bcr-wdc-demo-faucet` - A Demo Faucet for the Wildcat mint, which auto-offers bills below a certain threshold
 
