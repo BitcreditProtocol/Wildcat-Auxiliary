@@ -117,6 +117,8 @@ jobs:
             dockerfile: docker/ebill-service/Dockerfile
           - name: bcr-wdc-relay
             dockerfile: docker/relay/Dockerfile
+          - name: bcr-wdc-demo-faucet
+            dockerfile: docker/demo-faucet/Dockerfile
 
     steps:
     - name: Checkout code

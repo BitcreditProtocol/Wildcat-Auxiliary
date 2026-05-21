@@ -11,6 +11,7 @@ members = [
   "crates/bcr-wdc-relay",
   "crates/bcr-wdc-ens-service",
   "crates/bcr-wdc-ebill-service",
+  "crates/bcr-wdc-demo-faucet",
 ]
 
 [workspace.dependencies]

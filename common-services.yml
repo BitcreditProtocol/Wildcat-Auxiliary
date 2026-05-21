@@ -33,6 +33,12 @@ services:
       start_period: 60s
       start_interval: 3s
 
+  demo-faucet:
+    image: wildcat/demo-faucet
+    pull_policy: never
+    volumes:
+      - ./docker/demo-faucet/config.toml:/demo-faucet/config.toml
+
   relay:
     image: wildcat/relay
     pull_policy: never

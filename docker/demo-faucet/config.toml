@@ -1,0 +1,9 @@
+log_level = "DEBUG"
+
+[appcfg]
+quotes_url = "http://quote-service:3338"
+sleep_secs = 2
+retention_period_secs = 60 
+max_requests_per_retention_period = 5
+max_bill_offer_sum = 5000
+discount_percent = 4
