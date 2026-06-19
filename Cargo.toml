@@ -18,11 +18,11 @@ members = [
 anyhow = {version = "1"}
 async-trait = {version = "0.1"}
 axum = {version = "0.8"}
-bcr-common = {git = "https://github.com/BitcreditProtocol/bcr-common.git", rev = "b8c8fd0ff9de3b9fbe1bc5d7650af3f8f635591e"}
-bcr-ebill-api = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", tag = "v0.5.11"}
-bcr-ebill-core = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", tag = "v0.5.11"}
-bcr-ebill-transport = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", tag = "v0.5.11"}
-bcr-ebill-persistence = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", tag = "v0.5.11"}
+bcr-common = {git = "https://github.com/BitcreditProtocol/bcr-common.git", rev = "bb5e380c2de166692a1a339a4d98029aec3f983f"}
+bcr-ebill-api = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "e6f16de775edb100ee167590f5fa1c25b953f535"}
+bcr-ebill-core = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "e6f16de775edb100ee167590f5fa1c25b953f535"}
+bcr-ebill-transport = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "e6f16de775edb100ee167590f5fa1c25b953f535"}
+bcr-ebill-persistence = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "e6f16de775edb100ee167590f5fa1c25b953f535"}
 bcr-wdc-shared = {path = "./crates/bcr-wdc-shared"}
 bip39 = {version = "2"}
 bitcoin = {version = "0.32"}
