@@ -44,7 +44,8 @@ use uuid::Uuid;
 // ----- local imports
 
 use crate::{
-    AppController, convert,
+    AppController,
+    convert::{self, bitcreditbillhistory_ebill2wire},
     error::{Error, Result},
 };
 // ----- end imports
@@ -71,11 +72,7 @@ pub fn get_chain_with_plaintext_from_shared_bill(
     shared_bill: &wire_quotes::SharedBill,
     private_key: &SecretKey,
 ) -> Result<Vec<BillBlockPlaintextWrapper>> {
-    let decoded = base58::decode(&shared_bill.data)
-        .map_err(|e| Error::SharedBill(format!("base58 decode: {e}")))?;
-    let decrypted = crypto::decrypt_ecies(&decoded, private_key)
-        .map_err(|e| Error::SharedBill(format!("decryption: {e}")))?;
-
+    let decrypted = decode_and_decrypt_shared_bill_data(&shared_bill.data, private_key)?;
     // check that hash matches
     let shared_bill_hash = Sha256Hash::from_str(&shared_bill.hash)?;
     if shared_bill_hash != Sha256Hash::from_bytes(&decrypted) {
@@ -85,6 +82,17 @@ pub fn get_chain_with_plaintext_from_shared_bill(
     let deserialized: Vec<BillBlockPlaintextWrapper> = borsh::from_slice(&decrypted)
         .map_err(|e| Error::SharedBill(format!("deserialization: {e}")))?;
     Ok(deserialized)
+}
+
+fn decode_and_decrypt_shared_bill_data(
+    shared_bill_data: &str,
+    private_key: &SecretKey,
+) -> Result<Vec<u8>> {
+    let decoded = base58::decode(shared_bill_data)
+        .map_err(|e| Error::SharedBill(format!("base58 decode: {e}")))?;
+    let decrypted = crypto::decrypt_ecies(&decoded, private_key)
+        .map_err(|e| Error::SharedBill(format!("decryption: {e}")))?;
+    Ok(decrypted)
 }
 
 /// Validates and decrypts a shared bill.
@@ -204,6 +212,73 @@ pub async fn validate_and_decrypt_shared_bill(
         maturity_date,
         file_urls: payload.file_urls,
     }))
+}
+
+#[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl, payload))]
+pub async fn get_shared_bill_history(
+    State(ctrl): State<AppController>,
+    Json(payload): Json<wire_quotes::SharedBillData>,
+) -> Result<Json<Vec<wire_bill::BillHistoryBlock>>> {
+    let keys = ctrl.identity_service.get_keys().await?;
+    let decrypted = decode_and_decrypt_shared_bill_data(&payload.data, &keys.get_private_key())
+        .map_err(|e| Error::SharedBillData(e.to_string()))?;
+    let deserialized: Vec<BillBlockPlaintextWrapper> = borsh::from_slice(&decrypted)
+        .map_err(|e| Error::SharedBill(format!("deserialization: {e}")))?;
+
+    BillBlockchain::new_from_blocks(
+        deserialized
+            .iter()
+            .map(|wrapper| wrapper.block.to_owned())
+            .collect::<Vec<BillBlock>>(),
+    )
+    .map_err(|e| Error::SharedBillData(format!("invalid chain: {e}")))?;
+
+    let bill_history = bcr_ebill_core::protocol::blockchain::bill::BillHistory {
+        blocks: deserialized
+            .into_iter()
+            .map(|block| {
+                block
+                    .get_history()
+                    .map_err(|e| Error::SharedBillData(format!("block history: {e}")))
+            })
+            .collect::<Result<Vec<bcr_ebill_core::protocol::blockchain::bill::BillHistoryBlock>>>()
+            .map_err(|e| Error::SharedBillData(format!("bill history: {e}")))?,
+    };
+
+    let history = bitcreditbillhistory_ebill2wire(bill_history);
+    Ok(Json(history))
+}
+
+#[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl))]
+pub async fn get_bill_payment_actions(
+    State(ctrl): State<AppController>,
+    Path(bill_id): Path<BillId>,
+) -> Result<Json<Vec<wire_bill::BillCallerPaymentAction>>> {
+    let current_timestamp = Timestamp::now();
+    let identity = ctrl.identity_service.get_full_identity().await?;
+    let bill_detail = ctrl
+        .bill_service
+        .get_detail(
+            &bill_id,
+            &identity.identity,
+            &bcr_ebill_core::protocol::blockchain::bill::participant::BillParticipant::Ident(
+                bcr_ebill_core::protocol::blockchain::bill::participant::BillIdentParticipant::new(
+                    identity.identity.clone(),
+                )?,
+            ),
+            &identity.key_pair,
+            current_timestamp,
+        )
+        .await?;
+
+    let wpas: Vec<wire_bill::BillCallerPaymentAction> = bill_detail
+        .actions
+        .payment_actions
+        .into_iter()
+        .map(convert::bitcreditbillpaymentactions_ebill2wire)
+        .collect();
+
+    Ok(Json(wpas))
 }
 
 #[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl))]
@@ -346,6 +421,48 @@ pub async fn get_bill_detail(
         .await?;
     let wbill = convert::bitcreditbill_ebill2wire(bill_detail)?;
     Ok(Json(wbill))
+}
+
+#[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl))]
+pub async fn get_bill_history(
+    State(ctrl): State<AppController>,
+    Path(bill_id): Path<BillId>,
+) -> Result<Json<Vec<wire_bill::BillHistoryBlock>>> {
+    tracing::debug!("Received get bill history request");
+    let current_timestamp = Timestamp::now();
+    let identity = ctrl.identity_service.get_full_identity().await?;
+    let bill_detail = ctrl
+        .bill_service
+        .get_detail(
+            &bill_id,
+            &identity.identity,
+            &bcr_ebill_core::protocol::blockchain::bill::participant::BillParticipant::Ident(
+                bcr_ebill_core::protocol::blockchain::bill::participant::BillIdentParticipant::new(
+                    identity.identity.clone(),
+                )?,
+            ),
+            &identity.key_pair,
+            current_timestamp,
+        )
+        .await?;
+    let history = bitcreditbillhistory_ebill2wire(bill_detail.history);
+    Ok(Json(history))
+}
+
+#[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl))]
+pub async fn sync_bill_chain(
+    State(ctrl): State<AppController>,
+    Json(sync_bill_payload): Json<wire_bill::ResyncBillPayload>,
+) -> Result<Json<SuccessResponse>> {
+    tracing::debug!("Received sync bill payload");
+    ctrl.notification_service
+        .block_transport()
+        .resync_bill_chain(
+            &sync_bill_payload.bill_id,
+            sync_bill_payload.from_nostr.unwrap_or(false),
+        )
+        .await?;
+    Ok(Json(SuccessResponse { success: true }))
 }
 
 #[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl))]

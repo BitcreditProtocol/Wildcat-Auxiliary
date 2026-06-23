@@ -56,6 +56,10 @@ pub enum Error {
     #[error("Shared Bill Error: {0}")]
     SharedBill(String),
 
+    /// all errors originating from fetching data from a shared bill
+    #[error("Shared Bill Data Error: {0}")]
+    SharedBillData(String),
+
     #[error("Protocol Validation error: {0}")]
     ProtocolValidation(#[from] ProtocolValidationError),
 }
@@ -86,6 +90,7 @@ impl axum::response::IntoResponse for Error {
             )
                 .into_response(),
             Error::SharedBill(e) => (StatusCode::BAD_REQUEST, e).into_response(),
+            Error::SharedBillData(e) => (StatusCode::BAD_REQUEST, e).into_response(),
             Error::IdentityAlreadyExists => (
                 StatusCode::BAD_REQUEST,
                 String::from("Identity already exists"),

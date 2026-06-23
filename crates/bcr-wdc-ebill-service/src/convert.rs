@@ -420,3 +420,139 @@ pub(crate) fn bitcreditbill_ebill2wire(
     };
     Ok(output)
 }
+
+pub(crate) fn bitcreditbillhistory_ebill2wire(
+    input: bcr_ebill_core::protocol::blockchain::bill::BillHistory,
+) -> Vec<wire_bill::BillHistoryBlock> {
+    input
+        .blocks
+        .into_iter()
+        .map(|block| wire_bill::BillHistoryBlock {
+            block_id: block.block_id.inner(),
+            block_type: block.block_type.to_string(),
+            pay_to_the_order_of: block.pay_to_the_order_of.map(billparticipant_ebill2wire),
+            payment_data: block
+                .payment_data
+                .map(bitcredithistoryblockpaymentdata_ebill2wire),
+            request_deadline: block.request_deadline.map(|t| t.inner()),
+            signed: bitcreditsignedby_ebill2wire(block.signed),
+            signing_timestamp: block.signing_timestamp.inner(),
+            signing_address: block.signing_address.map(postaladdress_ebill2wire),
+        })
+        .collect()
+}
+
+pub(crate) fn bitcredithistoryblockpaymentdata_ebill2wire(
+    input: bcr_ebill_core::protocol::blockchain::bill::BillHistoryBlockPaymentData,
+) -> wire_bill::BillHistoryBlockPaymentData {
+    wire_bill::BillHistoryBlockPaymentData {
+        currency: input.sum.currency().code().to_owned(),
+        sum: input.sum.as_sat_string(),
+        payment_address: input.payment_address.assume_checked().to_string(),
+    }
+}
+
+pub(crate) fn bitcreditsignedby_ebill2wire(
+    input: bcr_ebill_core::protocol::blockchain::bill::participant::SignedBy,
+) -> wire_bill::SignedBy {
+    wire_bill::SignedBy {
+        data: billparticipant_ebill2wire(input.data),
+        signatory: input.signatory.map(bitcreditsignatory_ebill2wire),
+    }
+}
+
+pub(crate) fn bitcreditsignatory_ebill2wire(
+    input: bcr_ebill_core::protocol::blockchain::bill::participant::BillSignatory,
+) -> wire_bill::BillSignatory {
+    wire_bill::BillSignatory {
+        node_id: input.node_id,
+        name: input.name.map(|n| n.to_string()),
+    }
+}
+
+pub(crate) fn bitcreditbillpaymentactions_ebill2wire(
+    input: bcr_ebill_core::application::bill::BillCallerPaymentAction,
+) -> wire_bill::BillCallerPaymentAction {
+    match input {
+        ebill_bill::BillCallerPaymentAction::Pay(bill_caller_payment) => {
+            wire_bill::BillCallerPaymentAction::Pay(bitcreditbillcallerpayment_ebill2wire(
+                bill_caller_payment,
+            ))
+        }
+        ebill_bill::BillCallerPaymentAction::CheckPayment(bill_caller_payment) => {
+            wire_bill::BillCallerPaymentAction::CheckPayment(bitcreditbillcallerpayment_ebill2wire(
+                bill_caller_payment,
+            ))
+        }
+    }
+}
+
+pub(crate) fn bitcreditbillcallerpayment_ebill2wire(
+    input: bcr_ebill_core::application::bill::BillCallerPayment,
+) -> wire_bill::BillCallerPayment {
+    match input {
+        ebill_bill::BillCallerPayment::Sell {
+            buyer,
+            seller,
+            state,
+        } => wire_bill::BillCallerPayment::Sell {
+            buyer: billparticipant_ebill2wire(buyer),
+            seller: billparticipant_ebill2wire(seller),
+            state: bitcreditbillcallerpaymentstate_ebill2wire(state),
+        },
+        ebill_bill::BillCallerPayment::Payment {
+            payer,
+            payee,
+            state,
+        } => wire_bill::BillCallerPayment::Payment {
+            payer: billidentparticipant_ebill2wire(payer),
+            payee: billparticipant_ebill2wire(payee),
+            state: bitcreditbillcallerpaymentstate_ebill2wire(state),
+        },
+        ebill_bill::BillCallerPayment::Recourse {
+            recourser,
+            recoursee,
+            state,
+        } => wire_bill::BillCallerPayment::Recourse {
+            recourser: billparticipant_ebill2wire(recourser),
+            recoursee: billidentparticipant_ebill2wire(recoursee),
+            state: bitcreditbillcallerpaymentstate_ebill2wire(state),
+        },
+    }
+}
+
+pub(crate) fn bitcreditbillcallerpaymentstate_ebill2wire(
+    input: bcr_ebill_core::application::bill::BillCallerPaymentState,
+) -> wire_bill::BillCallerPaymentState {
+    wire_bill::BillCallerPaymentState {
+        time_of_request: input.time_of_request.inner(),
+        sum: input.sum.as_sat_string(),
+        currency: input.sum.currency().code().to_owned(),
+        address_to_pay: input.address_to_pay.assume_checked().to_string(),
+        status: bitcreditbillpaymentstatus_ebill2wire(input.status),
+        payment_deadline: input.payment_deadline.inner(),
+        tx_id: input.tx_id.to_owned(),
+        in_mempool: input.in_mempool,
+        confirmations: input.confirmations,
+        private_descriptor_to_spend: input.private_descriptor_to_spend.map(|pd| pd.to_string()),
+    }
+}
+
+pub(crate) fn bitcreditbillpaymentstatus_ebill2wire(
+    input: bcr_ebill_core::protocol::blockchain::bill::PaymentStatus,
+) -> wire_bill::PaymentStatus {
+    match input {
+        bcr_ebill_core::protocol::blockchain::bill::PaymentStatus::Requested(timestamp) => {
+            wire_bill::PaymentStatus::Requested(timestamp.inner())
+        }
+        bcr_ebill_core::protocol::blockchain::bill::PaymentStatus::Paid(timestamp) => {
+            wire_bill::PaymentStatus::Paid(timestamp.inner())
+        }
+        bcr_ebill_core::protocol::blockchain::bill::PaymentStatus::Rejected(timestamp) => {
+            wire_bill::PaymentStatus::Rejected(timestamp.inner())
+        }
+        bcr_ebill_core::protocol::blockchain::bill::PaymentStatus::Expired(timestamp) => {
+            wire_bill::PaymentStatus::Expired(timestamp.inner())
+        }
+    }
+}

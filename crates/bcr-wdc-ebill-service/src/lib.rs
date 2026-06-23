@@ -6,6 +6,7 @@ use axum::{
     extract::FromRef,
     routing::{get, post, put},
 };
+use bcr_common::client::ebill::Client as EbillClient;
 use bcr_ebill_api::{
     external::{
         bitcoin::BitcoinClient,
@@ -181,41 +182,63 @@ impl AppController {
 
 pub fn routes(ctrl: AppController) -> Router {
     Router::new()
-        .route("/v1/admin/identity/detail", get(web::get_identity))
-        .route("/v1/admin/identity/create", post(web::create_identity))
-        .route("/v1/admin/identity/seed/backup", get(web::get_seed_phrase))
+        .route(EbillClient::GET_IDENTITY_EP_V1, get(web::get_identity))
         .route(
-            "/v1/admin/identity/seed/recover",
+            EbillClient::CREATE_IDENTITY_EP_V1,
+            post(web::create_identity),
+        )
+        .route(
+            EbillClient::BACKUP_SEED_PHRASE_EP_V1,
+            get(web::get_seed_phrase),
+        )
+        .route(
+            EbillClient::RESTORE_FROM_SEED_PHRASE_EP_V1,
             put(web::recover_from_seed_phrase),
         )
-        .route("/v1/admin/bill/list", get(web::get_bills))
-        .route("/v1/admin/bill/detail/{bill_id}", get(web::get_bill_detail))
+        .route(EbillClient::GET_BILLS_EP_V1, get(web::get_bills))
+        .route(EbillClient::GET_BILL_EP_V1, get(web::get_bill_detail))
         .route(
-            "/v1/admin/bill/payment_status/{bill_id}",
+            EbillClient::GET_BILL_PAYMENT_ACTIONS_EP_V1,
+            get(web::get_bill_payment_actions),
+        )
+        .route(
+            EbillClient::GET_BILL_HISTORY_EP_V1,
+            get(web::get_bill_history),
+        )
+        .route(
+            EbillClient::GET_BILL_PAYMENT_STATUS_EP_V1,
             get(web::get_bill_payment_status),
         )
         .route(
-            "/v1/admin/bill/endorsements/{bill_id}",
+            EbillClient::GET_BILL_ENDORSEMENTS_EP_V1,
             get(web::get_bill_endorsements),
         )
         .route(
-            "/v1/admin/bill/attachment/{bill_id}/{file_name}",
+            EbillClient::GET_BILL_ATTACHMENT_EP_V1,
             get(web::get_bill_attachment),
         )
         .route(
-            "/v1/admin/bill/request_to_pay",
+            EbillClient::REQUEST_TO_PAY_BILL_EP_V1,
             put(web::request_to_pay_bill),
         )
         .route(
-            "/v1/admin/bill/prepare_request_to_pay",
+            EbillClient::PREPARE_REQUEST_TO_PAY_BILL_EP_V1,
             post(web::prepare_request_to_pay_bill),
         )
         .route(
-            "/v1/admin/bill/validate_and_decrypt_shared_bill",
+            EbillClient::SYNC_BILL_CHAIN_EP_V1,
+            post(web::sync_bill_chain),
+        )
+        .route(
+            EbillClient::VALIDATE_AND_DECRYPT_SHARED_BILL_EP_V1,
             post(web::validate_and_decrypt_shared_bill),
         )
         .route(
-            "/v1/admin/bill/get_file_from_request_to_mint",
+            EbillClient::GET_SHARED_BILL_HISTORY_EP_V1,
+            post(web::get_shared_bill_history),
+        )
+        .route(
+            EbillClient::GET_FILE_FROM_REQUEST_TO_MINT_EP_V1,
             get(web::get_encrypted_bill_file_from_request_to_mint),
         )
         .with_state(ctrl)
