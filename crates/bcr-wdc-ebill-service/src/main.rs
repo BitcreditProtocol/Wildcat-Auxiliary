@@ -104,6 +104,7 @@ async fn main() {
             blossom_servers: maincfg.appcfg.nostr_cfg.blossom_servers.clone(),
             only_known_contacts: maincfg.appcfg.nostr_cfg.only_known_contacts,
             max_relays: Some(50),
+            relay_ack_threshold: 1,
         },
         mint_config: MintConfig {
             default_mint_url: maincfg.appcfg.mint_config.default_mint_url.clone(),
