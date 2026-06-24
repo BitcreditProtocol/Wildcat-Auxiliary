@@ -129,7 +129,8 @@ pub fn discount_sats(sum: u64, discount_percent: u64, maturity_date: NaiveDate) 
         .signed_duration_since(Utc::now().date_naive())
         .num_days()
         .clamp(1, 360) as u64;
-    sum - (sum * discount_percent * days / 100 / 360)
+    let fee = (sum * discount_percent * days / 100 / 360).max(1); // at least 1 sat
+    if sum > fee { sum - fee } else { sum }
 }
 
 #[cfg(test)]
@@ -171,5 +172,15 @@ mod tests {
     fn one_day() {
         let maturity_date = Utc::now().date_naive() + Duration::days(1);
         assert_eq!(discount_sats(360_000, 10, maturity_date), 359_900);
+    }
+
+    #[test]
+    fn returns_at_least_one_sat_fee() {
+        let maturity_date = Utc::now().date_naive() + Duration::days(1);
+        assert_eq!(discount_sats(0, 4, maturity_date), 0);
+        assert_eq!(discount_sats(1, 4, maturity_date), 1);
+        assert_eq!(discount_sats(2, 4, maturity_date), 1);
+        assert_eq!(discount_sats(100, 4, maturity_date), 99);
+        assert_eq!(discount_sats(1000, 4, maturity_date), 999);
     }
 }
