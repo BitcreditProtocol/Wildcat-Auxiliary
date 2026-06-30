@@ -234,6 +234,10 @@ pub fn routes(ctrl: AppController) -> Router {
             post(web::validate_and_decrypt_shared_bill),
         )
         .route(
+            EbillClient::VALIDATE_ENDORSED_BILL_MATCHES_SHARED_BILL_EP_V1,
+            post(web::validate_endorsed_bill_matches_shared_bill),
+        )
+        .route(
             EbillClient::GET_SHARED_BILL_HISTORY_EP_V1,
             post(web::get_shared_bill_history),
         )

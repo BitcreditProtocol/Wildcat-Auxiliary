@@ -122,13 +122,21 @@ pub async fn validate_and_decrypt_shared_bill(
             .map_err(|e| Error::SharedBill(e.to_string()))?;
 
     // validate chain
-    BillBlockchain::new_from_blocks(
+    let chain = BillBlockchain::new_from_blocks(
         chain_with_plaintext
             .iter()
             .map(|wrapper| wrapper.block.to_owned())
             .collect::<Vec<BillBlock>>(),
     )
     .map_err(|e| Error::SharedBill(format!("invalid chain: {e}")))?;
+    if !ctrl
+        .notification_service
+        .block_transport()
+        .validate_bill_blocks_exist_on_nostr_chain(&payload.bill_id, chain.blocks())
+        .await?
+    {
+        return Err(Error::SharedBill("Different Bill on Nostr".into()));
+    }
 
     // validate plaintext hash
     for block_wrapper in chain_with_plaintext.iter() {
@@ -212,6 +220,51 @@ pub async fn validate_and_decrypt_shared_bill(
         maturity_date,
         file_urls: payload.file_urls,
     }))
+}
+
+#[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl, payload))]
+pub async fn validate_endorsed_bill_matches_shared_bill(
+    State(ctrl): State<AppController>,
+    Json(payload): Json<wire_quotes::SharedBillData>,
+) -> Result<()> {
+    tracing::debug!("Received validate endorsed bill matches shared bill request");
+    let identity = ctrl.identity_service.get_full_identity().await?;
+    let keys = identity.key_pair;
+    let decrypted = decode_and_decrypt_shared_bill_data(&payload.data, &keys.get_private_key())
+        .map_err(|e| Error::SharedBillData(e.to_string()))?;
+    let deserialized: Vec<BillBlockPlaintextWrapper> = borsh::from_slice(&decrypted)
+        .map_err(|e| Error::SharedBill(format!("deserialization: {e}")))?;
+
+    let shared_chain = BillBlockchain::new_from_blocks(
+        deserialized
+            .iter()
+            .map(|wrapper| wrapper.block.to_owned())
+            .collect::<Vec<BillBlock>>(),
+    )
+    .map_err(|e| Error::SharedBillData(format!("invalid chain: {e}")))?;
+
+    let local_bill_chain = ctrl
+        .bill_service
+        .get_local_bill_chain(
+            &payload.bill_id,
+            &bcr_ebill_core::protocol::blockchain::bill::participant::BillParticipant::Ident(
+                bcr_ebill_core::protocol::blockchain::bill::participant::BillIdentParticipant::new(
+                    identity.identity.clone(),
+                )?,
+            ),
+        )
+        .await
+        .map_err(|e| Error::SharedBill(format!("local bill chain: {e}")))?;
+
+    let shared_chain_blocks = shared_chain.blocks();
+    let local_chain_blocks = local_bill_chain.blocks();
+    if !local_chain_blocks.starts_with(shared_chain_blocks) {
+        return Err(Error::SharedBill(
+            "Different Bill Locally than Shared Bill".into(),
+        ));
+    }
+
+    Ok(())
 }
 
 #[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl, payload))]
