@@ -127,7 +127,7 @@ impl EmailClient for MailjetClient {
             Some(msg) => {
                 if msg.status != "success" {
                     error!("Invalid email sending response: {}", &msg.status);
-                    Err(anyhow!("Invalid email sending response: {}", &msg.status))
+                    Err(anyhow!("Invalid email sending response: {}", msg.status))
                 } else {
                     Ok(())
                 }

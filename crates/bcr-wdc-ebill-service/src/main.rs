@@ -123,7 +123,6 @@ async fn main() {
             namespace: maincfg.appcfg.ebill_db.namespace.clone(),
             database: maincfg.appcfg.ebill_db.database.clone(),
         },
-        app_url: maincfg.appcfg.url.clone(),
         payment_config: PaymentConfig {
             num_confirmations_for_payment: maincfg
                 .appcfg

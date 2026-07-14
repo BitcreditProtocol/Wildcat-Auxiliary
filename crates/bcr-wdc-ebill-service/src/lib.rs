@@ -40,7 +40,6 @@ pub struct AppConfig {
     pub payment_config: PaymentConfig,
     pub job_runner_initial_delay_seconds: u64,
     pub job_runner_check_interval_seconds: u64,
-    pub url: url::Url,
     pub court_config: CourtConfig,
     pub dev_mode_config: DevModeConfig,
     pub identity_config: IdentityConfig,
@@ -167,6 +166,7 @@ impl AppController {
             notification_service.clone(),
             email_client.clone(),
             db.email_notification_store.clone(),
+            db.contact_store.clone(),
         );
 
         Self {
