@@ -153,7 +153,7 @@ pub async fn update_preferences(
         .await
     {
         Ok(()) => {
-            Redirect::to(&format!("/email/preferences/{}", &payload.pref_token)).into_response()
+            Redirect::to(&format!("/email/preferences/{}", payload.pref_token)).into_response()
         }
         Err(e) => {
             error!("Could not update preferences: {e}");
