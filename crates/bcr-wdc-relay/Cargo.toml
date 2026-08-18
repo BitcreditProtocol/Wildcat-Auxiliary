@@ -13,7 +13,7 @@ chrono.workspace = true
 clap = { version = "4.5.39", features = ["derive", "env"] }
 deadpool-postgres = "0.14"
 futures.workspace = true
-nostr = "0.44"
+nostr = "0.45"
 nostr-relay-builder = "0.44"
 base64-url = "3"
 nostr-postgres-db = { git = "https://github.com/BitcreditProtocol/nostr-postgres-db.git", rev = "01a4cf9" }
