@@ -64,9 +64,24 @@ pub enum Error {
     ProtocolValidation(#[from] ProtocolValidationError),
 }
 
+impl Error {
+    fn is_not_found(&self) -> bool {
+        matches!(
+            self,
+            Self::BillService(bill_service::Error::NotFound)
+                | Self::Service(service::Error::NotFound)
+                | Self::Service(service::Error::BillService(bill_service::Error::NotFound))
+        )
+    }
+}
+
 impl axum::response::IntoResponse for Error {
     fn into_response(self) -> axum::response::Response {
-        tracing::error!("Error: {self}");
+        if self.is_not_found() {
+            tracing::debug!("Request target not found: {self}");
+        } else {
+            tracing::error!("Error: {self}");
+        }
         match self {
             Error::Convert(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
             Error::Service(e) => ServiceError(e).into_response(),
@@ -100,6 +115,20 @@ impl axum::response::IntoResponse for Error {
                 (StatusCode::BAD_REQUEST, e.to_string()).into_response()
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::response::IntoResponse;
+
+    use super::*;
+
+    #[test]
+    fn expected_missing_bill_is_a_not_found_response() {
+        let error = Error::BillService(bill_service::Error::NotFound);
+        assert!(error.is_not_found());
+        assert_eq!(error.into_response().status(), StatusCode::NOT_FOUND);
     }
 }
 
