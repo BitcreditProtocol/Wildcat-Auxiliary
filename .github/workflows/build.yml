@@ -21,6 +21,7 @@ env:
 jobs:
 
   base-image:
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -99,6 +100,7 @@ jobs:
 
   wildcat-aux-images:
     needs: base-image
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     permissions:
       contents: read
