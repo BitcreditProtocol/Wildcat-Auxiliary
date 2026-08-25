@@ -87,6 +87,9 @@ pub struct DevModeConfig {
     pub on: bool,
     /// Whether mandatory email confirmations should be enabled (disable for easier testing)
     pub mandatory_email_confirmations: bool,
+    /// Allow HTTP only for the configured Blossom origins in an explicitly local environment.
+    #[serde(default)]
+    pub allow_insecure_blossom_http: bool,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -109,6 +112,7 @@ pub struct AppController {
     pub mint_client: Arc<dyn MintClientApi>,
     pub chain_key_service: Arc<dyn ChainKeyServiceApi>,
     pub cfg: Arc<Config>,
+    pub allowed_insecure_blossom_origins: Vec<url::Url>,
 }
 
 impl AppController {
@@ -116,7 +120,18 @@ impl AppController {
         cfg: Arc<Config>,
         nostr_client: Arc<NostrClient>,
         db: bcr_ebill_api::DbContext,
+        allow_insecure_blossom_http: bool,
     ) -> Self {
+        let allowed_insecure_blossom_origins = if allow_insecure_blossom_http {
+            cfg.nostr_config
+                .blossom_servers
+                .iter()
+                .filter(|url| url.scheme() == "http")
+                .cloned()
+                .collect()
+        } else {
+            Vec::new()
+        };
         let push_service = Arc::new(PushService::new());
         let email_client = Arc::new(EmailClient::new());
         let mint_client = Arc::new(MintClient::new(cfg.clone()));
@@ -194,6 +209,7 @@ impl AppController {
             mint_client,
             chain_key_service,
             cfg,
+            allowed_insecure_blossom_origins,
         }
     }
 }

@@ -175,9 +175,13 @@ async fn main() {
 
     let db_clone = db.clone();
     // set up application context
-    let app =
-        bcr_wdc_ebill_service::AppController::new(api_config.clone(), nostr_client.clone(), db)
-            .await;
+    let app = bcr_wdc_ebill_service::AppController::new(
+        api_config.clone(),
+        nostr_client.clone(),
+        db,
+        maincfg.appcfg.dev_mode_config.allow_insecure_blossom_http,
+    )
+    .await;
 
     // create identity if it doesn't exist and the flag for initializing a default identity is set
     // this is only useful, if we start an identity from scratch, otherwise we want to just recover a seed
