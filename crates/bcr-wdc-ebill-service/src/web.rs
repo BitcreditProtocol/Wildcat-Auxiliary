@@ -1,5 +1,9 @@
 // ----- standard library imports
-use std::{str::FromStr, time::Duration};
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    str::FromStr,
+    time::Duration,
+};
 // ----- extra library imports
 use axum::{
     Json,
@@ -682,15 +686,18 @@ async fn do_get_encrypted_bill_file_from_request_to_mint(
     file_url: &url::Url,
     allowed_insecure_origins: &[url::Url],
 ) -> Result<(String, Vec<u8>)> {
-    if !is_allowed_bill_file_url(file_url, allowed_insecure_origins) {
-        return Err(Error::FileDownload("File URL is not allowed".into()));
-    }
+    let resolved_target = resolve_bill_file_target(file_url, allowed_insecure_origins).await?;
 
     // fetch the file by URL
-    let client = reqwest::Client::builder()
+    let mut client_builder = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
+        .no_proxy()
         .connect_timeout(Duration::from_secs(5))
-        .timeout(Duration::from_secs(30))
+        .timeout(Duration::from_secs(30));
+    if let Some(domain) = &resolved_target.domain {
+        client_builder = client_builder.resolve_to_addrs(domain, &resolved_target.addresses);
+    }
+    let client = client_builder
         .build()
         .map_err(|_| Error::FileDownload("Could not create download client".into()))?;
     let resp = client.get(file_url.clone()).send().await.map_err(|e| {
@@ -747,9 +754,62 @@ async fn do_get_encrypted_bill_file_from_request_to_mint(
     Ok((content_type, decrypted))
 }
 
+struct ResolvedBillFileTarget {
+    domain: Option<String>,
+    addresses: Vec<SocketAddr>,
+}
+
+async fn resolve_bill_file_target(
+    file_url: &url::Url,
+    allowed_insecure_origins: &[url::Url],
+) -> Result<ResolvedBillFileTarget> {
+    if !is_allowed_bill_file_url(file_url, allowed_insecure_origins) {
+        return Err(Error::FileDownload("File URL is not allowed".into()));
+    }
+
+    let host = file_url
+        .host_str()
+        .ok_or_else(|| Error::FileDownload("File URL is not allowed".into()))?;
+    let port = file_url
+        .port_or_known_default()
+        .ok_or_else(|| Error::FileDownload("File URL is not allowed".into()))?;
+    let parsed_ip = host.parse::<IpAddr>().ok();
+    let mut addresses = match parsed_ip {
+        Some(ip) => vec![SocketAddr::new(ip, port)],
+        None => tokio::net::lookup_host((host, port))
+            .await
+            .map_err(|_| Error::FileDownload("Could not resolve file host".into()))?
+            .collect::<Vec<_>>(),
+    };
+    addresses.sort_unstable();
+    addresses.dedup();
+
+    if addresses.is_empty()
+        || (file_url.scheme() == "https"
+            && addresses
+                .iter()
+                .any(|address| !is_globally_routable_ip(address.ip())))
+    {
+        return Err(Error::FileDownload("File URL is not allowed".into()));
+    }
+
+    Ok(ResolvedBillFileTarget {
+        domain: parsed_ip.is_none().then(|| host.to_owned()),
+        addresses,
+    })
+}
+
 fn is_allowed_bill_file_url(file_url: &url::Url, allowed_insecure_origins: &[url::Url]) -> bool {
+    if !file_url.username().is_empty() || file_url.password().is_some() {
+        return false;
+    }
     if file_url.scheme() == "https" {
-        return true;
+        return file_url
+            .host_str()
+            .is_some_and(|host| match host.parse::<IpAddr>() {
+                Ok(ip) => is_globally_routable_ip(ip),
+                Err(_) => true,
+            });
     }
     if file_url.scheme() != "http" {
         return false;
@@ -762,35 +822,46 @@ fn is_allowed_bill_file_url(file_url: &url::Url, allowed_insecure_origins: &[url
     })
 }
 
-#[cfg(test)]
-mod bill_file_url_tests {
-    use super::is_allowed_bill_file_url;
-
-    #[test]
-    fn allows_https_and_only_the_configured_local_http_origin() {
-        let allowed = vec![url::Url::parse("http://host.docker.internal:8090").unwrap()];
-
-        assert!(is_allowed_bill_file_url(
-            &url::Url::parse("https://files.example/abc").unwrap(),
-            &allowed,
-        ));
-        assert!(is_allowed_bill_file_url(
-            &url::Url::parse("http://host.docker.internal:8090/abc").unwrap(),
-            &allowed,
-        ));
-        assert!(!is_allowed_bill_file_url(
-            &url::Url::parse("http://host.docker.internal:8080/abc").unwrap(),
-            &allowed,
-        ));
-        assert!(!is_allowed_bill_file_url(
-            &url::Url::parse("http://127.0.0.1:8090/abc").unwrap(),
-            &allowed,
-        ));
-        assert!(!is_allowed_bill_file_url(
-            &url::Url::parse("file:///tmp/abc").unwrap(),
-            &allowed,
-        ));
+fn is_globally_routable_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ip) => is_globally_routable_ipv4(ip),
+        IpAddr::V6(ip) => is_globally_routable_ipv6(ip),
     }
+}
+
+fn is_globally_routable_ipv4(ip: Ipv4Addr) -> bool {
+    let [a, b, c, _] = ip.octets();
+    !matches!(
+        (a, b, c),
+        (0, _, _)
+            | (10, _, _)
+            | (100, 64..=127, _)
+            | (127, _, _)
+            | (169, 254, _)
+            | (172, 16..=31, _)
+            | (192, 0, 0)
+            | (192, 0, 2)
+            | (192, 88, 99)
+            | (192, 168, _)
+            | (198, 18..=19, _)
+            | (198, 51, 100)
+            | (203, 0, 113)
+            | (224..=255, _, _)
+    )
+}
+
+fn is_globally_routable_ipv6(ip: Ipv6Addr) -> bool {
+    if ip.to_ipv4_mapped().is_some() {
+        return false;
+    }
+
+    let segments = ip.segments();
+    let is_global_unicast = (0x2000..=0x3fff).contains(&segments[0]);
+    let is_iana_special = (segments[0] == 0x2001 && segments[1] <= 0x01ff)
+        || (segments[0] == 0x2001 && segments[1] == 0x0db8)
+        || segments[0] == 0x2002
+        || (segments[0] == 0x3fff && segments[1] <= 0x0fff);
+    is_global_unicast && !is_iana_special
 }
 
 #[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl))]
@@ -860,4 +931,109 @@ pub async fn request_to_pay_bill(
         previous_block_hash,
         bill_private_key,
     }))
+}
+
+#[cfg(test)]
+mod bill_file_url_tests {
+    use std::net::IpAddr;
+
+    use super::{is_allowed_bill_file_url, is_globally_routable_ip};
+
+    #[test]
+    fn allows_https_and_only_the_configured_local_http_origin() {
+        let allowed = vec![url::Url::parse("http://host.docker.internal:8090").unwrap()];
+
+        assert!(is_allowed_bill_file_url(
+            &url::Url::parse("https://files.example/abc").unwrap(),
+            &allowed,
+        ));
+        assert!(!is_allowed_bill_file_url(
+            &url::Url::parse("https://127.0.0.1/abc").unwrap(),
+            &allowed,
+        ));
+        assert!(is_allowed_bill_file_url(
+            &url::Url::parse("http://host.docker.internal:8090/abc").unwrap(),
+            &allowed,
+        ));
+        assert!(!is_allowed_bill_file_url(
+            &url::Url::parse("http://host.docker.internal:8080/abc").unwrap(),
+            &allowed,
+        ));
+        assert!(!is_allowed_bill_file_url(
+            &url::Url::parse("http://127.0.0.1:8090/abc").unwrap(),
+            &allowed,
+        ));
+        assert!(!is_allowed_bill_file_url(
+            &url::Url::parse("file:///tmp/abc").unwrap(),
+            &allowed,
+        ));
+        assert!(!is_allowed_bill_file_url(
+            &url::Url::parse("https://user:secret@files.example/abc").unwrap(),
+            &allowed,
+        ));
+    }
+
+    #[test]
+    fn rejects_non_public_ip_ranges() {
+        let non_public = [
+            ("current network", "0.0.0.0"),
+            ("private", "10.0.0.1"),
+            ("CGNAT lower bound", "100.64.0.1"),
+            ("CGNAT upper bound", "100.127.255.254"),
+            ("loopback", "127.0.0.1"),
+            ("link-local", "169.254.1.1"),
+            ("private lower bound", "172.16.0.1"),
+            ("private upper bound", "172.31.255.254"),
+            ("protocol assignment", "192.0.0.1"),
+            ("documentation", "192.0.2.1"),
+            ("deprecated relay anycast", "192.88.99.1"),
+            ("private", "192.168.1.1"),
+            ("benchmark lower bound", "198.18.0.1"),
+            ("benchmark upper bound", "198.19.255.254"),
+            ("documentation", "198.51.100.1"),
+            ("documentation", "203.0.113.1"),
+            ("multicast lower bound", "224.0.0.1"),
+            ("multicast upper bound", "239.255.255.254"),
+            ("reserved", "240.0.0.1"),
+            ("broadcast", "255.255.255.255"),
+            ("unspecified IPv6", "::"),
+            ("loopback IPv6", "::1"),
+            ("IPv4-mapped public IPv6", "::ffff:8.8.8.8"),
+            ("IPv4-mapped loopback IPv6", "::ffff:127.0.0.1"),
+            ("IPv4-mapped private IPv6", "::ffff:192.168.1.1"),
+            ("NAT64", "64:ff9b::808:808"),
+            ("discard-only", "100::1"),
+            ("IETF assignment", "2001::1"),
+            ("benchmark IPv6", "2001:2::1"),
+            ("documentation IPv6", "2001:db8::1"),
+            ("6to4 private target", "2002:a00:1::"),
+            ("documentation IPv6", "3fff::1"),
+            ("unique local", "fc00::1"),
+            ("unique local", "fd00::1"),
+            ("link-local IPv6", "fe80::1"),
+            ("deprecated site-local", "fec0::1"),
+            ("multicast IPv6", "ff02::1"),
+        ];
+
+        for (category, value) in non_public {
+            let ip = value.parse::<IpAddr>().unwrap();
+            assert!(
+                !is_globally_routable_ip(ip),
+                "{category} address {value} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn allows_public_ip_addresses() {
+        for value in [
+            "1.1.1.1",
+            "8.8.8.8",
+            "2001:4860:4860::8888",
+            "2606:4700:4700::1111",
+        ] {
+            let ip = value.parse::<IpAddr>().unwrap();
+            assert!(is_globally_routable_ip(ip), "{value} must be allowed");
+        }
+    }
 }
