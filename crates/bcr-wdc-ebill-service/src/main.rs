@@ -175,7 +175,13 @@ async fn main() {
 
     let db_clone = db.clone();
     // set up application context
-    let app = bcr_wdc_ebill_service::AppController::new(api_config, nostr_client.clone(), db).await;
+    let app = bcr_wdc_ebill_service::AppController::new(
+        api_config,
+        nostr_client.clone(),
+        db,
+        maincfg.appcfg.dev_mode_config.allow_insecure_blossom_http,
+    )
+    .await;
 
     // create identity if it doesn't exist
     if !app.identity_service.identity_exists().await {
