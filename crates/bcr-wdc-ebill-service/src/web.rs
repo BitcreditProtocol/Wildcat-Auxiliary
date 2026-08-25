@@ -1,5 +1,5 @@
 // ----- standard library imports
-use std::str::FromStr;
+use std::{str::FromStr, time::Duration};
 // ----- extra library imports
 use axum::{
     Json,
@@ -181,8 +181,12 @@ pub async fn validate_and_decrypt_shared_bill(
             bill_data.files.iter().map(|f| f.hash.to_string()).collect();
         let mut file_hashes = Vec::with_capacity(bill_file_hashes.len());
         for file_url in payload.file_urls.iter() {
-            let (_, decrypted) =
-                do_get_encrypted_bill_file_from_request_to_mint(&key_pair, file_url).await?;
+            let (_, decrypted) = do_get_encrypted_bill_file_from_request_to_mint(
+                &key_pair,
+                file_url,
+                &ctrl.allowed_insecure_blossom_origins,
+            )
+            .await?;
             file_hashes.push(Sha256Hash::from_bytes(&decrypted));
         }
         // all of the shared file hashes have to be present on the bill
@@ -656,8 +660,12 @@ pub async fn get_encrypted_bill_file_from_request_to_mint(
     );
 
     let keys = ctrl.identity_service.get_full_identity().await?.key_pair;
-    let (content_type, decrypted) =
-        do_get_encrypted_bill_file_from_request_to_mint(&keys, &bill_file_url_req.file_url).await?;
+    let (content_type, decrypted) = do_get_encrypted_bill_file_from_request_to_mint(
+        &keys,
+        &bill_file_url_req.file_url,
+        &ctrl.allowed_insecure_blossom_origins,
+    )
+    .await?;
     let parsed_content_type: HeaderValue = content_type.parse().map_err(|_| {
         bcr_ebill_api::service::Error::Validation(
             ProtocolValidationError::InvalidContentType.into(),
@@ -672,13 +680,20 @@ pub async fn get_encrypted_bill_file_from_request_to_mint(
 async fn do_get_encrypted_bill_file_from_request_to_mint(
     keys: &BcrKeys,
     file_url: &url::Url,
+    allowed_insecure_origins: &[url::Url],
 ) -> Result<(String, Vec<u8>)> {
-    if file_url.scheme() != "https" {
-        return Err(Error::FileDownload("Only HTTPS urls are allowed".into()));
+    if !is_allowed_bill_file_url(file_url, allowed_insecure_origins) {
+        return Err(Error::FileDownload("File URL is not allowed".into()));
     }
 
     // fetch the file by URL
-    let resp = reqwest::get(file_url.clone()).await.map_err(|e| {
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(Duration::from_secs(5))
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|_| Error::FileDownload("Could not create download client".into()))?;
+    let resp = client.get(file_url.clone()).send().await.map_err(|e| {
         tracing::error!("Error downloading file from {}: {e}", file_url.to_string());
         Error::FileDownload("Could not download file".into())
     })?;
@@ -730,6 +745,52 @@ async fn do_get_encrypted_bill_file_from_request_to_mint(
     )?;
 
     Ok((content_type, decrypted))
+}
+
+fn is_allowed_bill_file_url(file_url: &url::Url, allowed_insecure_origins: &[url::Url]) -> bool {
+    if file_url.scheme() == "https" {
+        return true;
+    }
+    if file_url.scheme() != "http" {
+        return false;
+    }
+
+    allowed_insecure_origins.iter().any(|origin| {
+        origin.scheme() == "http"
+            && origin.host_str() == file_url.host_str()
+            && origin.port_or_known_default() == file_url.port_or_known_default()
+    })
+}
+
+#[cfg(test)]
+mod bill_file_url_tests {
+    use super::is_allowed_bill_file_url;
+
+    #[test]
+    fn allows_https_and_only_the_configured_local_http_origin() {
+        let allowed = vec![url::Url::parse("http://host.docker.internal:8090").unwrap()];
+
+        assert!(is_allowed_bill_file_url(
+            &url::Url::parse("https://files.example/abc").unwrap(),
+            &allowed,
+        ));
+        assert!(is_allowed_bill_file_url(
+            &url::Url::parse("http://host.docker.internal:8090/abc").unwrap(),
+            &allowed,
+        ));
+        assert!(!is_allowed_bill_file_url(
+            &url::Url::parse("http://host.docker.internal:8080/abc").unwrap(),
+            &allowed,
+        ));
+        assert!(!is_allowed_bill_file_url(
+            &url::Url::parse("http://127.0.0.1:8090/abc").unwrap(),
+            &allowed,
+        ));
+        assert!(!is_allowed_bill_file_url(
+            &url::Url::parse("file:///tmp/abc").unwrap(),
+            &allowed,
+        ));
+    }
 }
 
 #[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl))]
