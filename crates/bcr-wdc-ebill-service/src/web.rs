@@ -767,19 +767,20 @@ async fn resolve_bill_file_target(
         return Err(Error::FileDownload("File URL is not allowed".into()));
     }
 
-    let host = file_url
-        .host_str()
-        .ok_or_else(|| Error::FileDownload("File URL is not allowed".into()))?;
     let port = file_url
         .port_or_known_default()
         .ok_or_else(|| Error::FileDownload("File URL is not allowed".into()))?;
-    let parsed_ip = host.parse::<IpAddr>().ok();
-    let mut addresses = match parsed_ip {
-        Some(ip) => vec![SocketAddr::new(ip, port)],
-        None => tokio::net::lookup_host((host, port))
-            .await
-            .map_err(|_| Error::FileDownload("Could not resolve file host".into()))?
-            .collect::<Vec<_>>(),
+    let (domain, mut addresses) = match file_url.host() {
+        Some(url::Host::Ipv4(ip)) => (None, vec![SocketAddr::new(IpAddr::V4(ip), port)]),
+        Some(url::Host::Ipv6(ip)) => (None, vec![SocketAddr::new(IpAddr::V6(ip), port)]),
+        Some(url::Host::Domain(host)) => (
+            Some(host.to_owned()),
+            tokio::net::lookup_host((host, port))
+                .await
+                .map_err(|_| Error::FileDownload("Could not resolve file host".into()))?
+                .collect::<Vec<_>>(),
+        ),
+        None => return Err(Error::FileDownload("File URL is not allowed".into())),
     };
     addresses.sort_unstable();
     addresses.dedup();
@@ -793,10 +794,7 @@ async fn resolve_bill_file_target(
         return Err(Error::FileDownload("File URL is not allowed".into()));
     }
 
-    Ok(ResolvedBillFileTarget {
-        domain: parsed_ip.is_none().then(|| host.to_owned()),
-        addresses,
-    })
+    Ok(ResolvedBillFileTarget { domain, addresses })
 }
 
 fn is_allowed_bill_file_url(file_url: &url::Url, allowed_insecure_origins: &[url::Url]) -> bool {
@@ -804,12 +802,11 @@ fn is_allowed_bill_file_url(file_url: &url::Url, allowed_insecure_origins: &[url
         return false;
     }
     if file_url.scheme() == "https" {
-        return file_url
-            .host_str()
-            .is_some_and(|host| match host.parse::<IpAddr>() {
-                Ok(ip) => is_globally_routable_ip(ip),
-                Err(_) => true,
-            });
+        return file_url.host().is_some_and(|host| match host {
+            url::Host::Domain(_) => true,
+            url::Host::Ipv4(ip) => is_globally_routable_ip(IpAddr::V4(ip)),
+            url::Host::Ipv6(ip) => is_globally_routable_ip(IpAddr::V6(ip)),
+        });
     }
     if file_url.scheme() != "http" {
         return false;
@@ -817,7 +814,7 @@ fn is_allowed_bill_file_url(file_url: &url::Url, allowed_insecure_origins: &[url
 
     allowed_insecure_origins.iter().any(|origin| {
         origin.scheme() == "http"
-            && origin.host_str() == file_url.host_str()
+            && origin.host() == file_url.host()
             && origin.port_or_known_default() == file_url.port_or_known_default()
     })
 }
@@ -949,6 +946,14 @@ mod bill_file_url_tests {
         ));
         assert!(!is_allowed_bill_file_url(
             &url::Url::parse("https://127.0.0.1/abc").unwrap(),
+            &allowed,
+        ));
+        assert!(!is_allowed_bill_file_url(
+            &url::Url::parse("https://[::ffff:127.0.0.1]/abc").unwrap(),
+            &allowed,
+        ));
+        assert!(is_allowed_bill_file_url(
+            &url::Url::parse("https://[2606:4700:4700::1111]/abc").unwrap(),
             &allowed,
         ));
         assert!(is_allowed_bill_file_url(
