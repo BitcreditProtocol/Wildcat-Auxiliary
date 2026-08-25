@@ -11,10 +11,17 @@ use super::File;
 pub trait FileStoreApi: Send + Sync {
     async fn get(&self, hash: &Sha256Hash) -> Result<Option<File>, anyhow::Error>;
     async fn insert(&self, file: File) -> Result<(), anyhow::Error>;
+    async fn is_ready(&self) -> Result<bool, anyhow::Error> {
+        Ok(true)
+    }
 }
 
 #[async_trait]
 impl FileStoreApi for PostgresStore {
+    async fn is_ready(&self) -> Result<bool, anyhow::Error> {
+        PostgresStore::is_ready(self).await
+    }
+
     async fn get(&self, hash: &Sha256Hash) -> Result<Option<File>, anyhow::Error> {
         let row = self
             .pool
