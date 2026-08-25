@@ -28,7 +28,7 @@ use serde::Serialize;
 use std::{net::SocketAddr, sync::Arc};
 use tokio_postgres::NoTls;
 use tower_http::cors::{Any, CorsLayer};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
@@ -125,8 +125,21 @@ async fn handle_404(uri: Uri) -> impl IntoResponse {
     StatusCode::NOT_FOUND
 }
 
-pub async fn health() -> &'static str {
-    "{ \"status\": \"OK\" }"
+async fn health(State(state): State<AppState>) -> impl IntoResponse {
+    match state.file_store.is_ready().await {
+        Ok(true) => (StatusCode::OK, "{ \"status\": \"OK\" }"),
+        Ok(false) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "{ \"status\": \"NOT_READY\" }",
+        ),
+        Err(error) => {
+            warn!(%error, "Relay database readiness check failed");
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                "{ \"status\": \"NOT_READY\" }",
+            )
+        }
+    }
 }
 
 #[derive(Clone)]
