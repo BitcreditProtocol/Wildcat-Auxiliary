@@ -118,20 +118,6 @@ impl axum::response::IntoResponse for Error {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use axum::response::IntoResponse;
-
-    use super::*;
-
-    #[test]
-    fn expected_missing_bill_is_a_not_found_response() {
-        let error = Error::BillService(bill_service::Error::NotFound);
-        assert!(error.is_not_found());
-        assert_eq!(error.into_response().status(), StatusCode::NOT_FOUND);
-    }
-}
-
 pub struct ServiceError(bcr_ebill_api::service::Error);
 
 impl axum::response::IntoResponse for ServiceError {
@@ -212,5 +198,19 @@ impl axum::response::IntoResponse for ProtocolError {
             )
                 .into_response(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::response::IntoResponse;
+
+    use super::*;
+
+    #[test]
+    fn expected_missing_bill_is_a_not_found_response() {
+        let error = Error::BillService(bill_service::Error::NotFound);
+        assert!(error.is_not_found());
+        assert_eq!(error.into_response().status(), StatusCode::NOT_FOUND);
     }
 }
