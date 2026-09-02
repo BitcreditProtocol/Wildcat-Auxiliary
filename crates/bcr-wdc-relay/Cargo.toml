@@ -16,7 +16,7 @@ futures.workspace = true
 nostr = "0.44"
 nostr-relay-builder = "0.44"
 base64-url = "3"
-nostr-postgres-db = { git = "https://github.com/BitcreditProtocol/nostr-postgres-db.git", rev = "01a4cf9" }
+nostr-postgres-db = { git = "https://github.com/BitcreditProtocol/nostr-postgres-db.git", rev = "ac2b2f9a8fef12ebc5e2f07eebcc068f4d01b804" }
 reqwest = { workspace = true, features = ["stream", "rustls-tls"] }
 serde.workspace = true
 serde_json.workspace = true
