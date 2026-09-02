@@ -69,7 +69,7 @@ jobs:
           prefix-key: "wildcat-auxiliary"
 
       - name: Check
-        run: cargo check --verbose
+        run: cargo check --verbose --locked
 
       - name: Check formatting
         run: cargo fmt -- --check
@@ -80,6 +80,7 @@ jobs:
           cargo clippy
           --verbose
           --all-features
+          --locked
           --message-format=json | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
         continue-on-error: true
 
@@ -88,7 +89,7 @@ jobs:
         continue-on-error: true
 
       - name: Build
-        run: cargo build --verbose
+        run: cargo build --verbose --locked
 
       - name: Upload analysis results to GitHub
         uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4

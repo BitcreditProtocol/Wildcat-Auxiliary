@@ -73,7 +73,7 @@ jobs:
           prefix-key: "wildcat-auxiliary"
 
       - name: Run tests
-        run: cargo test --workspace --verbose
+        run: cargo test --workspace --verbose --locked
         env:
           LLVM_PROFILE_FILE: "target/coverage/%p-%m.profraw"
           RUSTFLAGS: "-Cinstrument-coverage"
