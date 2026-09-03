@@ -1,6 +1,9 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt::Debug,
+    future::Future,
+    net::SocketAddr,
+    pin::Pin,
     sync::Arc,
 };
 
@@ -9,16 +12,14 @@ use chrono::{DateTime, Duration, Utc};
 use clap::Parser;
 use deadpool_postgres::Pool;
 use nostr::{
-    event::{Event, Kind, TagKind, TagStandard},
-    filter::{Alphabet, SingleLetterTag},
-    nips::nip73::ExternalContentId,
+    event::{Event, Kind},
+    message::MachineReadablePrefix,
+    nips::nip73::{ExternalContentId, Nip73Tag},
     types::Url,
-    util::BoxedFuture,
 };
 use nostr_postgres_db::*;
-use nostr_relay_builder::{
-    LocalRelay, RelayBuilder,
-    builder::{PolicyResult, RelayBuilderNip42, RelayBuilderNip42Mode, WritePolicy},
+use nostr_sdk::local_relay::{
+    LocalRelay, LocalRelayBuilder, LocalRelayBuilderNip42, WritePolicy, WritePolicyResult,
 };
 use tokio::sync::Mutex;
 use tracing::info;
@@ -28,24 +29,22 @@ use crate::rate_limit::{PRUNE_INTERVAL, SlidingWindow};
 const BCR_NOSTR_CHAIN_PREFIX: &str = "bitcredit";
 
 pub async fn init(config: &RelayConfig, pool: Pool) -> Result<LocalRelay> {
-    let relay = LocalRelay::new(builder(config, pool).await?);
+    let relay = builder(config, pool).await?.build();
     relay.run().await?;
     Ok(relay)
 }
 
-async fn builder(config: &RelayConfig, pool: Pool) -> Result<RelayBuilder> {
+async fn builder(config: &RelayConfig, pool: Pool) -> Result<LocalRelayBuilder> {
     let dba = database(pool).await?;
-    Ok(RelayBuilder::default()
+    Ok(LocalRelay::builder()
         .nip42(auth_mode())
         .database(dba)
         .write_policy(block_rate_limiter(config)))
 }
 
-fn auth_mode() -> RelayBuilderNip42 {
-    RelayBuilderNip42 {
-        // read and write requires client auth
-        mode: RelayBuilderNip42Mode::Both,
-    }
+fn auth_mode() -> LocalRelayBuilderNip42 {
+    // read and write requires client auth
+    LocalRelayBuilderNip42::read_and_write()
 }
 
 fn block_rate_limiter(config: &RelayConfig) -> BlockRateLimiter<NostrRateLimiter> {
@@ -126,8 +125,8 @@ impl<T: NostrRateLimiterApi> WritePolicy for BlockRateLimiter<T> {
     fn admit_event<'a>(
         &'a self,
         event: &'a Event,
-        addr: &'a std::net::SocketAddr,
-    ) -> BoxedFuture<'a, nostr_relay_builder::builder::PolicyResult> {
+        addr: &'a SocketAddr,
+    ) -> Pin<Box<dyn Future<Output = WritePolicyResult> + Send + 'a>> {
         Box::pin(async move {
             match event.kind {
                 Kind::TextNote => {
@@ -139,11 +138,12 @@ impl<T: NostrRateLimiterApi> WritePolicy for BlockRateLimiter<T> {
                             .allowed(format!("{}:{chain_key}", addr).as_str(), Utc::now())
                     {
                         info!("Rate limit rejected BCR public chain block: {chain_key}");
-                        PolicyResult::Reject(format!(
-                            "Rate limit exceeded for BCR chain event {chain_key}"
-                        ))
+                        WritePolicyResult::reject(
+                            MachineReadablePrefix::RateLimited,
+                            format!("Rate limit exceeded for BCR chain event {chain_key}"),
+                        )
                     } else {
-                        PolicyResult::Accept
+                        WritePolicyResult::Accept
                     }
                 }
                 Kind::GiftWrap => {
@@ -151,9 +151,9 @@ impl<T: NostrRateLimiterApi> WritePolicy for BlockRateLimiter<T> {
                         "Received gift wrap DM event {} from author: {}",
                         event.id, event.pubkey
                     );
-                    PolicyResult::Accept
+                    WritePolicyResult::Accept
                 }
-                _ => PolicyResult::Accept,
+                _ => WritePolicyResult::Accept,
             }
         })
     }
@@ -211,28 +211,21 @@ impl NostrRateLimiterApi for NostrRateLimiter {
 fn bcr_chain_key(event: &Event, chains: &HashSet<String>) -> Option<String> {
     event
         .tags
-        .filter_standardized(TagKind::SingleLetter(SingleLetterTag::lowercase(
-            Alphabet::I,
-        )))
+        .iter()
+        .filter(|tag| tag.kind() == "i")
+        .filter_map(|tag| Nip73Tag::try_from(tag).ok())
         .find_map(|tag| match tag {
-            TagStandard::ExternalContent {
+            Nip73Tag::ExternalContent {
                 content:
                     ExternalContentId::BlockchainAddress {
                         chain,
-                        chain_id,
+                        chain_id: Some(chain_id),
                         address,
-                        ..
                     },
                 ..
-            } if chain_id.is_some()
-                && chain == BCR_NOSTR_CHAIN_PREFIX
-                && chains.contains(chain_id.as_ref().unwrap()) =>
-            {
-                info!(
-                    "Received BCR public chain block for chain: {} id: {address}",
-                    chain_id.as_ref().unwrap(),
-                );
-                chain_id.as_ref().map(|id| format!("{id}:{address}"))
+            } if chain == BCR_NOSTR_CHAIN_PREFIX && chains.contains(&chain_id) => {
+                info!("Received BCR public chain block for chain: {chain_id} id: {address}");
+                Some(format!("{chain_id}:{address}"))
             }
             _ => None,
         })
@@ -245,7 +238,7 @@ mod tests {
     use super::*;
     use chrono::TimeZone;
     use nostr::{
-        event::{EventBuilder, Tag},
+        event::{EventBuilder, FinalizeEvent, Tag},
         key::Keys,
     };
 
@@ -297,27 +290,26 @@ mod tests {
     }
 
     pub fn bcr_nostr_tag(id: &str, blockchain: &str) -> Tag {
-        TagStandard::ExternalContent {
+        Nip73Tag::ExternalContent {
             content: tag_content(id, blockchain),
             hint: None,
-            uppercase: false,
         }
         .into()
     }
     // Create a test BCR chain event
     fn create_bcr_chain_event(chain_id: &str, address: &str) -> Event {
         let keys = Keys::generate();
-        EventBuilder::text_note("This is a test BCR chain event")
+        EventBuilder::new(Kind::TextNote, "This is a test BCR chain event")
             .tag(bcr_nostr_tag(address, chain_id))
-            .sign_with_keys(&keys)
+            .finalize(&keys)
             .unwrap()
     }
 
     // Create a test non-BCR event
     fn create_non_bcr_event() -> Event {
         let keys = Keys::generate();
-        EventBuilder::text_note("This is a regular event")
-            .sign_with_keys(&keys)
+        EventBuilder::new(Kind::TextNote, "This is a regular event")
+            .finalize(&keys)
             .unwrap()
     }
 
@@ -364,24 +356,24 @@ mod tests {
 
         // First two should be accepted
         let result1 = block_limiter.admit_event(&event1, &socket).await;
-        assert!(matches!(result1, PolicyResult::Accept));
+        assert!(result1.is_accept());
 
         let result2 = block_limiter.admit_event(&event2, &socket).await;
-        assert!(matches!(result2, PolicyResult::Accept));
+        assert!(result2.is_accept());
 
         // Third should be rejected due to rate limit
         let result3 = block_limiter.admit_event(&event3, &socket).await;
-        assert!(matches!(result3, PolicyResult::Reject(_)));
+        assert!(result3.is_reject());
 
         // Test with different address should be accepted (different rate limit key)
         let event_diff_addr = create_bcr_chain_event("bill", "addr456");
         let result_diff_addr = block_limiter.admit_event(&event_diff_addr, &socket).await;
-        assert!(matches!(result_diff_addr, PolicyResult::Accept));
+        assert!(result_diff_addr.is_accept());
 
         // Test with non-BCR event should always be accepted
         let non_bcr_event = create_non_bcr_event();
         let non_bcr_result = block_limiter.admit_event(&non_bcr_event, &socket).await;
-        assert!(matches!(non_bcr_result, PolicyResult::Accept));
+        assert!(non_bcr_result.is_accept());
     }
 
     #[tokio::test]
@@ -400,25 +392,33 @@ mod tests {
         let event = create_bcr_chain_event("bill", "addr123");
 
         // First two events from socket1 should be accepted
-        assert!(matches!(
-            block_limiter.admit_event(&event, &socket1).await,
-            PolicyResult::Accept
-        ));
-        assert!(matches!(
-            block_limiter.admit_event(&event, &socket1).await,
-            PolicyResult::Accept
-        ));
+        assert!(
+            block_limiter
+                .admit_event(&event, &socket1)
+                .await
+                .is_accept()
+        );
+        assert!(
+            block_limiter
+                .admit_event(&event, &socket1)
+                .await
+                .is_accept()
+        );
 
         // Third should be rejected due to rate limit
-        assert!(matches!(
-            block_limiter.admit_event(&event, &socket1).await,
-            PolicyResult::Reject(_)
-        ));
+        assert!(
+            block_limiter
+                .admit_event(&event, &socket1)
+                .await
+                .is_reject()
+        );
 
         // But same event from socket2 should be accepted (different IP)
-        assert!(matches!(
-            block_limiter.admit_event(&event, &socket2).await,
-            PolicyResult::Accept
-        ));
+        assert!(
+            block_limiter
+                .admit_event(&event, &socket2)
+                .await
+                .is_accept()
+        );
     }
 }
