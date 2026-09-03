@@ -9,14 +9,12 @@ use axum::{
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
-use futures::StreamExt;
-use nostr::{
-    hashes::{
-        Hash,
-        sha256::{self, Hash as Sha256Hash},
-    },
-    types::Url,
+use bitcoin_hashes::{
+    Hash,
+    sha256::{self, Hash as Sha256Hash},
 };
+use futures::StreamExt;
+use nostr::types::Url;
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
 use tracing::{error, info};
@@ -146,7 +144,7 @@ pub async fn handle_upload(State(state): State<AppState>, body: Bytes) -> impl I
         return (StatusCode::BAD_REQUEST, "Invalid body").into_response();
     }
     let pubkey_bytes = &body[0..ENCRYPTION_PUB_KEY_BYTE_LEN];
-    if let Err(e) = nostr::secp256k1::PublicKey::from_slice(pubkey_bytes) {
+    if let Err(e) = secp256k1::PublicKey::from_slice(pubkey_bytes) {
         error!("Non-encrypted Upload rejected: {e}");
         return (StatusCode::BAD_REQUEST, "Invalid body").into_response();
     }
@@ -363,7 +361,7 @@ pub async fn handle_mirror(
     }
 
     let pubkey_bytes = &file_bytes[0..ENCRYPTION_PUB_KEY_BYTE_LEN];
-    if let Err(e) = nostr::secp256k1::PublicKey::from_slice(pubkey_bytes) {
+    if let Err(e) = secp256k1::PublicKey::from_slice(pubkey_bytes) {
         error!("Non-encrypted blob rejected: {}", e);
         return mirror_error_response(StatusCode::BAD_REQUEST, "Invalid blob format");
     }
@@ -498,7 +496,10 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use axum::body::to_bytes;
-    use nostr::{Kind, event::EventBuilder, key::Keys};
+    use nostr::{
+        event::{EventBuilder, FinalizeEvent, Kind, Tag},
+        key::Keys,
+    };
     use std::sync::{Arc, Mutex};
 
     /// Mock implementation of FileStoreApi for testing
@@ -555,9 +556,7 @@ mod tests {
     fn create_test_state() -> AppState {
         let mock_store = Arc::new(MockFileStore::new());
         AppState {
-            relay: nostr_relay_builder::LocalRelay::new(
-                nostr_relay_builder::RelayBuilder::default(),
-            ),
+            relay: nostr_sdk::local_relay::LocalRelay::new(),
             cfg: crate::AppConfig {
                 host_url: Url::parse("http://localhost:8080").unwrap(),
                 max_file_size_bytes: 10_000_000, // 10MB
@@ -687,9 +686,9 @@ mod tests {
 
     fn create_auth_token(keys: &Keys, hash: &Sha256Hash, kind: u16, t_tag: &str) -> String {
         let event = EventBuilder::new(Kind::from(kind), "mirror request")
-            .tag(nostr::Tag::parse(["t", t_tag]).unwrap())
-            .tag(nostr::Tag::parse(["x", &hash.to_string()]).unwrap())
-            .sign_with_keys(keys)
+            .tag(Tag::parse(["t", t_tag]).unwrap())
+            .tag(Tag::parse(["x", &hash.to_string()]).unwrap())
+            .finalize(keys)
             .unwrap();
 
         let event_json = serde_json::to_string(&event).unwrap();
@@ -838,8 +837,8 @@ mod tests {
 
         // Create token without x tag
         let event = EventBuilder::new(Kind::from(24242), "mirror request")
-            .tag(nostr::Tag::parse(["t", "upload"]).unwrap())
-            .sign_with_keys(&keys)
+            .tag(Tag::parse(["t", "upload"]).unwrap())
+            .finalize(&keys)
             .unwrap();
 
         let event_json = serde_json::to_string(&event).unwrap();

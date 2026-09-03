@@ -7,7 +7,9 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use nostr::{Kind, TagKind, event::Event, hashes::sha256::Hash as Sha256Hash};
+use bitcoin_hashes::sha256::Hash as Sha256Hash;
+use nostr::event::{Event, Kind, Tag};
+use nostr::types::Timestamp;
 use tracing::error;
 
 /// Errors that can occur during auth token validation
@@ -75,21 +77,18 @@ impl NostrAuthToken {
     pub fn from_event(event: Event) -> Result<Self, AuthError> {
         // Check if event is expired
         if let Some(expiration) = event.tags.expiration() {
-            let now = nostr::Timestamp::now();
-            if *expiration < now {
+            let now = Timestamp::now();
+            if expiration < now {
                 error!("Auth token expired: expiration={}", expiration);
                 return Err(AuthError::ExpiredToken);
             }
         }
 
         // Extract t tag
-        let t_tag = event
-            .tags
-            .find(TagKind::from("t"))
-            .and_then(|t| t.content().map(|s| s.to_string()));
+        let t_tag = find_tag(&event, "t").and_then(|t| t.content().map(|s| s.to_string()));
 
         // Extract x tag (SHA256 hash)
-        let x_tag = event.tags.find(TagKind::from("x")).and_then(|t| {
+        let x_tag = find_tag(&event, "x").and_then(|t| {
             t.content()
                 .and_then(|content| content.parse::<Sha256Hash>().ok())
         });
@@ -108,6 +107,11 @@ impl NostrAuthToken {
     }
 }
 
+/// First tag of the given kind, if any
+fn find_tag<'a>(event: &'a Event, kind: &str) -> Option<&'a Tag> {
+    event.tags.iter().find(|tag| tag.kind() == kind)
+}
+
 /// Extractor for NostrAuthToken from Authorization header
 pub fn extract_auth_token(headers: &axum::http::HeaderMap) -> Result<NostrAuthToken, AuthError> {
     let auth_header = headers
@@ -122,7 +126,8 @@ pub fn extract_auth_token(headers: &axum::http::HeaderMap) -> Result<NostrAuthTo
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nostr::{Timestamp, event::EventBuilder, key::Keys};
+    use nostr::event::{EventBuilder, FinalizeEvent};
+    use nostr::key::Keys;
 
     fn create_test_keys() -> Keys {
         Keys::generate()
@@ -132,7 +137,7 @@ mod tests {
     fn test_from_header_valid() {
         let keys = create_test_keys();
         let event = EventBuilder::new(Kind::from(24242), "test")
-            .sign_with_keys(&keys)
+            .finalize(&keys)
             .unwrap();
 
         let event_json = serde_json::to_string(&event).unwrap();
@@ -161,8 +166,8 @@ mod tests {
         let past_time = Timestamp::now() - 3600; // 1 hour ago
 
         let event = EventBuilder::new(Kind::from(24242), "test")
-            .tag(nostr::Tag::expiration(past_time))
-            .sign_with_keys(&keys)
+            .tag(Tag::expiration(past_time))
+            .finalize(&keys)
             .unwrap();
 
         let event_json = serde_json::to_string(&event).unwrap();
@@ -178,9 +183,9 @@ mod tests {
         let hash_str = "0000000000000000000000000000000000000000000000000000000000000001";
 
         let event = EventBuilder::new(Kind::from(24242), "test")
-            .tag(nostr::Tag::hashtag("mirror"))
-            .tag(nostr::Tag::parse(["x", hash_str]).unwrap())
-            .sign_with_keys(&keys)
+            .tag(Tag::hashtag("mirror"))
+            .tag(Tag::parse(["x", hash_str]).unwrap())
+            .finalize(&keys)
             .unwrap();
 
         let event_json = serde_json::to_string(&event).unwrap();
@@ -197,7 +202,7 @@ mod tests {
         let keys = create_test_keys();
 
         let event = EventBuilder::new(Kind::from(24242), "test")
-            .sign_with_keys(&keys)
+            .finalize(&keys)
             .unwrap();
 
         let event_json = serde_json::to_string(&event).unwrap();

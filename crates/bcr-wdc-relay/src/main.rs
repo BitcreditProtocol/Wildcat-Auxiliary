@@ -22,7 +22,7 @@ use deadpool_postgres::ManagerConfig;
 use deadpool_postgres::Pool;
 use deadpool_postgres::RecyclingMethod;
 use nostr::types::Url;
-use nostr_relay_builder::LocalRelay;
+use nostr_sdk::local_relay::LocalRelay;
 use relay::RelayConfig;
 use serde::Serialize;
 use std::{net::SocketAddr, sync::Arc};
@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
     let env_filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new("info"))
         .add_directive(
-            "nostr_relay_builder::local::inner=off"
+            "nostr_sdk::local_relay::local::inner=off"
                 .parse()
                 .expect("valid tracing directive"),
         );

@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::db::PostgresStore;
 use async_trait::async_trait;
-use nostr::hashes::sha256::Hash as Sha256Hash;
+use bitcoin_hashes::sha256::Hash as Sha256Hash;
 use tokio_postgres::Row;
 
 use super::File;
