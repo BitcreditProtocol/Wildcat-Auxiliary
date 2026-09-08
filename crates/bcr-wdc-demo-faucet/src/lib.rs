@@ -66,13 +66,7 @@ pub async fn main_loop(
             let last_requests = activity_log.entry(holder).or_default();
 
             // remove timestamps outside the window
-            while let Some(front) = last_requests.front() {
-                if submitted - *front < retention_period {
-                    last_requests.pop_front();
-                } else {
-                    break;
-                }
-            }
+            evict_expired(last_requests, submitted, retention_period);
 
             // if holder did more requests in the last $retention_period than we allow, deny to avoid spam
             if last_requests.len() >= max_requests_per_retention_period {
@@ -119,6 +113,17 @@ pub async fn main_loop(
     Ok(())
 }
 
+// drop oldest-first timestamps whose age at `now` is beyond `retention_period`
+fn evict_expired(log: &mut VecDeque<TStamp>, now: TStamp, retention_period: chrono::Duration) {
+    while let Some(front) = log.front() {
+        if now - *front > retention_period {
+            log.pop_front();
+        } else {
+            break;
+        }
+    }
+}
+
 // Act/360 helper to calculate discounted sum
 pub fn discount_sats(sum: u64, discount_percent: u64, maturity_date: NaiveDate) -> u64 {
     if discount_percent == 0 {
@@ -137,6 +142,29 @@ pub fn discount_sats(sum: u64, discount_percent: u64, maturity_date: NaiveDate) 
 mod tests {
     use super::*;
     use chrono::Duration;
+
+    #[test]
+    fn evicts_only_timestamps_older_than_retention() {
+        let now = Utc::now();
+        let retention = Duration::seconds(60);
+        let mut log: VecDeque<TStamp> = [120, 61, 60, 30, 0]
+            .map(|s| now - Duration::seconds(s))
+            .into();
+        evict_expired(&mut log, now, retention);
+        assert_eq!(log.len(), 3);
+        assert_eq!(*log.front().unwrap(), now - retention);
+    }
+
+    #[test]
+    fn eviction_drains_log_after_retention_elapses() {
+        let now = Utc::now();
+        let retention = Duration::seconds(60);
+        let mut log: VecDeque<TStamp> = (0..5).rev().map(|s| now - Duration::seconds(s)).collect();
+        evict_expired(&mut log, now, retention);
+        assert_eq!(log.len(), 5);
+        evict_expired(&mut log, now + retention + Duration::seconds(1), retention);
+        assert!(log.is_empty());
+    }
 
     #[test]
     fn returns_sum_when_discount_percent_is_zero() {
