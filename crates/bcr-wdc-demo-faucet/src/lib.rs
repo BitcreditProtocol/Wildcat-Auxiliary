@@ -159,7 +159,7 @@ mod tests {
     fn eviction_drains_log_after_retention_elapses() {
         let now = Utc::now();
         let retention = Duration::seconds(60);
-        let mut log: VecDeque<TStamp> = (0..5).map(|s| now - Duration::seconds(s)).collect();
+        let mut log: VecDeque<TStamp> = (0..5).rev().map(|s| now - Duration::seconds(s)).collect();
         evict_expired(&mut log, now, retention);
         assert_eq!(log.len(), 5);
         evict_expired(&mut log, now + retention + Duration::seconds(1), retention);
