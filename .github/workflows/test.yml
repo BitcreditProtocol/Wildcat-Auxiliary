@@ -65,7 +65,13 @@ jobs:
         run: rustup component add llvm-tools-preview
 
       - name: Install grcov
-        run: cargo install grcov
+        env:
+          CARGO_INSTALL_ROOT: ${{ runner.temp }}/cargo-tools-cold-install
+        run: |
+          test ! -e "$CARGO_INSTALL_ROOT"
+          cargo install grcov@0.10.7 --locked
+          "$CARGO_INSTALL_ROOT/bin/grcov" --version
+          echo "$CARGO_INSTALL_ROOT/bin" >> "$GITHUB_PATH"
 
       - name: Activate cache
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2

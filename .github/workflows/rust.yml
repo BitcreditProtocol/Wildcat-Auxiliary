@@ -61,7 +61,15 @@ jobs:
         run: rustup component add clippy rustfmt
 
       - name: Install required cargo tools
-        run: cargo install cargo-deny clippy-sarif sarif-fmt
+        env:
+          CARGO_INSTALL_ROOT: ${{ runner.temp }}/cargo-tools-cold-install
+        run: |
+          test ! -e "$CARGO_INSTALL_ROOT"
+          cargo install cargo-deny@0.20.2 clippy-sarif@0.8.0 sarif-fmt@0.8.0 --locked
+          "$CARGO_INSTALL_ROOT/bin/cargo-deny" --version
+          "$CARGO_INSTALL_ROOT/bin/clippy-sarif" --version
+          "$CARGO_INSTALL_ROOT/bin/sarif-fmt" --version
+          echo "$CARGO_INSTALL_ROOT/bin" >> "$GITHUB_PATH"
 
       - name: Activate cache
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
