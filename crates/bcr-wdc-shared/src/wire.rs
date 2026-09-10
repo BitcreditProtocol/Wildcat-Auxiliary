@@ -3,12 +3,10 @@ use crate::{
     serialize_tstamp_as_u64,
 };
 use bcr_common::core::NodeId;
+use bitcoin::secp256k1::schnorr::Signature;
 use borsh::{BorshDeserialize, BorshSerialize};
 use email_address::EmailAddress;
-use secp256k1::schnorr::Signature;
 use serde::{Deserialize, Serialize};
-
-// TODO: move to bcr-common
 
 #[derive(Debug, Deserialize)]
 pub struct ChallengeRequest {

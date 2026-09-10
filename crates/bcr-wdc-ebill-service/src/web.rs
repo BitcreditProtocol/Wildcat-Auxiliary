@@ -13,7 +13,7 @@ use bcr_common::{
 };
 use bcr_ebill_api::{
     constants::MAX_DOCUMENT_FILE_SIZE_BYTES,
-    service::file_upload_service::detect_content_type_for_bytes,
+    service::{file_upload_service::detect_content_type_for_bytes, transport_service::ResyncMode},
 };
 use bcr_ebill_core::{
     application::identity::IdentityWithAll,
@@ -45,7 +45,7 @@ use uuid::Uuid;
 
 use crate::{
     AppController,
-    convert::{self, bitcreditbillhistory_ebill2wire},
+    convert::{self, DATE_FORMAT, bitcreditbillhistory_ebill2wire},
     error::{Error, Result},
 };
 // ----- end imports
@@ -205,7 +205,7 @@ pub async fn validate_and_decrypt_shared_bill(
         .into_iter()
         .map(convert::billparticipant_ebill2wire)
         .collect();
-    let maturity_date = chrono::NaiveDate::from_str(&bill_data.maturity_date.to_string())
+    let maturity_date = time::Date::parse(&bill_data.maturity_date.to_string(), DATE_FORMAT)
         .map_err(|e| Error::SharedBill(e.to_string()))?;
 
     // create result
@@ -513,6 +513,7 @@ pub async fn sync_bill_chain(
         .resync_bill_chain(
             &sync_bill_payload.bill_id,
             sync_bill_payload.from_nostr.unwrap_or(false),
+            ResyncMode::Normal,
         )
         .await?;
     Ok(Json(SuccessResponse { success: true }))

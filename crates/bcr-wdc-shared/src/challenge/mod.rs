@@ -1,9 +1,9 @@
 use anyhow::{Result, anyhow};
 use bcr_common::core::NodeId;
 use bitcoin::base58;
-use chrono::TimeDelta;
-use secp256k1::schnorr::Signature;
+use bitcoin::secp256k1::schnorr::Signature;
 use std::fmt;
+use time::Duration;
 use tracing::warn;
 
 use crate::{TStamp, now, signature};
@@ -22,14 +22,14 @@ impl Default for Challenge {
 
 impl Challenge {
     /// Maximum age of a challenge - we expect requests to be made immediately after each other
-    const CHALLENGE_EXPIRY: TimeDelta = TimeDelta::minutes(2);
+    const CHALLENGE_EXPIRY: Duration = Duration::minutes(2);
 
     pub fn new() -> Self {
         let challenge = base58::encode(&rand::random::<[u8; 32]>());
         Self(challenge)
     }
 
-    pub fn ttl(&self) -> TimeDelta {
+    pub fn ttl(&self) -> Duration {
         Self::CHALLENGE_EXPIRY
     }
 
@@ -47,7 +47,7 @@ impl Challenge {
         // check if challenge timed out
         if now()
             > (created_at
-                .checked_add_signed(self.ttl())
+                .checked_add(self.ttl())
                 .expect("safe to add seconds"))
         {
             return Err(anyhow!("Challenge Timed Out"));

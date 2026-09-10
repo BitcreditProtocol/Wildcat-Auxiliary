@@ -22,7 +22,7 @@ use deadpool_postgres::ManagerConfig;
 use deadpool_postgres::Pool;
 use deadpool_postgres::RecyclingMethod;
 use nostr::types::Url;
-use nostr_relay_builder::LocalRelay;
+use nostr_sdk::local_relay::LocalRelay;
 use relay::RelayConfig;
 use serde::Serialize;
 use std::{net::SocketAddr, sync::Arc};

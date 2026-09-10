@@ -7,9 +7,11 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use bcr_common::core::NodeId;
 use bcr_wdc_shared::{TStamp, challenge::persistence::ChallengeRepository, now};
+use bitcoin::secp256k1::schnorr::Signature;
 use email_address::EmailAddress;
-use secp256k1::schnorr::Signature;
-use surrealdb::{Result as SurrealResult, Surreal, engine::any::Any};
+use surrealdb::{Surreal, engine::any::Any};
+
+type SurrealResult<T> = std::result::Result<T, Box<surrealdb::Error>>;
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct ConnectionConfig {
@@ -64,6 +66,7 @@ pub struct EmailConfirmationDBEntry {
     pub email: EmailAddress,
     pub confirmation_code: String,
     pub wrong_entries: usize,
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: TStamp,
 }
 
@@ -99,6 +102,7 @@ pub struct EmailRegistrationDBEntry {
     pub company_node_id: Option<NodeId>,
     pub email: EmailAddress,
     pub mint_signature: Signature,
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: TStamp,
 }
 

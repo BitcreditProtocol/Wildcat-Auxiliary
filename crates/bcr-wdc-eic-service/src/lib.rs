@@ -10,7 +10,7 @@ use bcr_wdc_shared::{
     rate_limit::RateLimiter,
 };
 use bitcoin::Network;
-use secp256k1::{SECP256K1, SecretKey};
+use bitcoin::secp256k1::{SECP256K1, SecretKey};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 

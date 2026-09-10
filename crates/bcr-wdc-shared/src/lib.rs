@@ -8,10 +8,10 @@ pub mod rate_limit;
 pub mod signature;
 pub mod wire;
 
-pub type TStamp = chrono::DateTime<chrono::Utc>;
+pub type TStamp = time::OffsetDateTime;
 
 pub fn now() -> TStamp {
-    chrono::Utc::now()
+    time::OffsetDateTime::now_utc()
 }
 
 pub fn serialize_as_str<T>(t: &T, writer: &mut impl Write) -> Result<(), BorshError>
@@ -34,16 +34,14 @@ where
 }
 
 pub fn serialize_tstamp_as_u64(t: &TStamp, writer: &mut impl Write) -> Result<(), BorshError> {
-    let v: u64 = t.timestamp() as u64;
+    let v: u64 = t.unix_timestamp() as u64;
     borsh::BorshSerialize::serialize(&v, writer)?;
     Ok(())
 }
 
 pub fn deserialize_tstamp_as_u64(reader: &mut impl Read) -> Result<TStamp, BorshError> {
     let v: u64 = borsh::BorshDeserialize::deserialize_reader(reader)?;
-    let tstamp: TStamp = TStamp::from_timestamp_secs(v as i64).ok_or(BorshError::new(
-        ErrorKind::InvalidInput,
-        anyhow!("invalid timestamp"),
-    ))?;
+    let tstamp: TStamp = TStamp::from_unix_timestamp(v as i64)
+        .map_err(|_| BorshError::new(ErrorKind::InvalidInput, anyhow!("invalid timestamp")))?;
     Ok(tstamp)
 }

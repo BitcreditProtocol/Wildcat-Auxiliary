@@ -1,31 +1,31 @@
 use bcr_common::core::NodeId;
-use chrono::TimeDelta;
 use email_address::EmailAddress;
 use std::collections::{HashMap, VecDeque};
+use time::Duration;
 
 use crate::{TStamp, now};
 
 /// How often do we allow the same email to be registered in the time frame
 const EMAIL_LIMIT: usize = 20;
-const EMAIL_WINDOW: TimeDelta = TimeDelta::days(1);
+const EMAIL_WINDOW: Duration = Duration::days(1);
 
 /// How often do we allow the same nodeid in the time frame
 const NODE_ID_LIMIT: usize = 50;
-const NODE_ID_WINDOW: TimeDelta = TimeDelta::minutes(10);
+const NODE_ID_WINDOW: Duration = Duration::minutes(10);
 
-const MAX_IDLE: TimeDelta = TimeDelta::days(1); // remove after 1 day idle
-pub const PRUNE_INTERVAL: TimeDelta = TimeDelta::minutes(10); // check every 10 minutes
+const MAX_IDLE: Duration = Duration::days(1); // remove after 1 day idle
+pub const PRUNE_INTERVAL: Duration = Duration::minutes(10); // check every 10 minutes
 
 #[derive(Debug)]
 pub struct SlidingWindow {
     hits: VecDeque<TStamp>,
-    window: TimeDelta,
+    window: Duration,
     limit: usize,
     last_seen: TStamp,
 }
 
 impl SlidingWindow {
-    pub fn new(limit: usize, window: TimeDelta) -> Self {
+    pub fn new(limit: usize, window: Duration) -> Self {
         Self {
             hits: VecDeque::with_capacity(limit),
             window,

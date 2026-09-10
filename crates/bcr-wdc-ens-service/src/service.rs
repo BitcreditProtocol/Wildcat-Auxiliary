@@ -11,8 +11,8 @@ use bcr_wdc_shared::{
     challenge::{Challenge, persistence::ChallengeRepository},
     email::mailjet::EmailClient,
 };
+use bitcoin::secp256k1::schnorr::Signature;
 use email_address::EmailAddress;
-use secp256k1::schnorr::Signature;
 use std::sync::Arc;
 use tracing::{error, warn};
 use uuid::Uuid;

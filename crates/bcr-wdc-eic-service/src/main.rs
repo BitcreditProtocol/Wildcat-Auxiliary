@@ -1,5 +1,5 @@
 use bcr_common::core::NodeId;
-use secp256k1::{SECP256K1, SecretKey};
+use bitcoin::secp256k1::{SECP256K1, SecretKey};
 use std::env;
 use std::str::FromStr;
 use tokio::signal;
