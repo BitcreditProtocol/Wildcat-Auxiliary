@@ -9,8 +9,10 @@ use bcr_common::core::NodeId;
 use bcr_wdc_shared::challenge::persistence::ChallengeRepository;
 use bcr_wdc_shared::{TStamp, now};
 use email_address::EmailAddress;
-use surrealdb::{Result as SurrealResult, Surreal, engine::any::Any};
+use surrealdb::{Surreal, engine::any::Any};
 use uuid::Uuid;
+
+type SurrealResult<T> = std::result::Result<T, Box<surrealdb::Error>>;
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct ConnectionConfig {
@@ -58,6 +60,7 @@ pub struct EmailNotificationPreferencesDBEntry {
     pub enabled: bool,
     pub preferences: i64,
     pub pref_token: Uuid,
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: TStamp,
 }
 

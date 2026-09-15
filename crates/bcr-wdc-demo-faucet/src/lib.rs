@@ -3,10 +3,9 @@ use bcr_common::{
     core::NodeId,
     wire::quotes::{InfoReply, InfoReplyDiscriminants, ListParam, UpdateQuoteResponse},
 };
-use chrono::{NaiveDate, Utc};
 use std::collections::{HashMap, VecDeque};
 
-type TStamp = chrono::DateTime<chrono::Utc>;
+type TStamp = time::OffsetDateTime;
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct AppConfig {
@@ -34,7 +33,7 @@ pub async fn main_loop(
     let quote_client = QuoteClient::new(quotes_url);
 
     let sleep = tokio::time::Duration::from_secs(sleep_secs);
-    let retention_period = chrono::Duration::seconds(retention_period_secs);
+    let retention_period = time::Duration::seconds(retention_period_secs);
 
     // sliding window activity log for holders
     let mut activity_log: HashMap<NodeId, VecDeque<TStamp>> = HashMap::new();
@@ -114,7 +113,7 @@ pub async fn main_loop(
 }
 
 // drop oldest-first timestamps whose age at `now` is beyond `retention_period`
-fn evict_expired(log: &mut VecDeque<TStamp>, now: TStamp, retention_period: chrono::Duration) {
+fn evict_expired(log: &mut VecDeque<TStamp>, now: TStamp, retention_period: time::Duration) {
     while let Some(front) = log.front() {
         if now - *front > retention_period {
             log.pop_front();
@@ -125,14 +124,13 @@ fn evict_expired(log: &mut VecDeque<TStamp>, now: TStamp, retention_period: chro
 }
 
 // Act/360 helper to calculate discounted sum
-pub fn discount_sats(sum: u64, discount_percent: u64, maturity_date: NaiveDate) -> u64 {
+pub fn discount_sats(sum: u64, discount_percent: u64, maturity_date: time::Date) -> u64 {
     if discount_percent == 0 {
         return sum;
     }
     let discount_percent = discount_percent.clamp(0, 99);
-    let days = maturity_date
-        .signed_duration_since(Utc::now().date_naive())
-        .num_days()
+    let days = (maturity_date - time::OffsetDateTime::now_utc().date())
+        .whole_days()
         .clamp(1, 360) as u64;
     let fee = (sum * discount_percent * days / 100 / 360).max(1); // at least 1 sat
     if sum > fee { sum - fee } else { sum }
@@ -141,11 +139,11 @@ pub fn discount_sats(sum: u64, discount_percent: u64, maturity_date: NaiveDate) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Duration;
+    use time::Duration;
 
     #[test]
     fn evicts_only_timestamps_older_than_retention() {
-        let now = Utc::now();
+        let now = time::OffsetDateTime::now_utc();
         let retention = Duration::seconds(60);
         let mut log: VecDeque<TStamp> = [120, 61, 60, 30, 0]
             .map(|s| now - Duration::seconds(s))
@@ -157,7 +155,7 @@ mod tests {
 
     #[test]
     fn eviction_drains_log_after_retention_elapses() {
-        let now = Utc::now();
+        let now = time::OffsetDateTime::now_utc();
         let retention = Duration::seconds(60);
         let mut log: VecDeque<TStamp> = (0..5).rev().map(|s| now - Duration::seconds(s)).collect();
         evict_expired(&mut log, now, retention);
@@ -168,43 +166,43 @@ mod tests {
 
     #[test]
     fn returns_sum_when_discount_percent_is_zero() {
-        let maturity_date = Utc::now().date_naive() + Duration::days(180);
+        let maturity_date = time::OffsetDateTime::now_utc().date() + Duration::days(180);
         assert_eq!(discount_sats(100_000, 0, maturity_date), 100_000);
     }
 
     #[test]
     fn calculates_half_year_discount() {
-        let maturity_date = Utc::now().date_naive() + Duration::days(180);
+        let maturity_date = time::OffsetDateTime::now_utc().date() + Duration::days(180);
         assert_eq!(discount_sats(100_000, 10, maturity_date), 95_000);
     }
 
     #[test]
     fn clamps_maturity_to_360_days() {
-        let maturity_date = Utc::now().date_naive() + Duration::days(720);
+        let maturity_date = time::OffsetDateTime::now_utc().date() + Duration::days(720);
         assert_eq!(discount_sats(100_000, 10, maturity_date), 90_000);
     }
 
     #[test]
     fn clamps_past_maturity_to_one_day() {
-        let maturity_date = Utc::now().date_naive() - Duration::days(30);
+        let maturity_date = time::OffsetDateTime::now_utc().date() - Duration::days(30);
         assert_eq!(discount_sats(360_000, 10, maturity_date), 359_900);
     }
 
     #[test]
     fn clamps_maturity_and_percent() {
-        let maturity_date = Utc::now().date_naive() + Duration::days(720);
+        let maturity_date = time::OffsetDateTime::now_utc().date() + Duration::days(720);
         assert_eq!(discount_sats(360_000, 150, maturity_date), 3600);
     }
 
     #[test]
     fn one_day() {
-        let maturity_date = Utc::now().date_naive() + Duration::days(1);
+        let maturity_date = time::OffsetDateTime::now_utc().date() + Duration::days(1);
         assert_eq!(discount_sats(360_000, 10, maturity_date), 359_900);
     }
 
     #[test]
     fn returns_at_least_one_sat_fee() {
-        let maturity_date = Utc::now().date_naive() + Duration::days(1);
+        let maturity_date = time::OffsetDateTime::now_utc().date() + Duration::days(1);
         assert_eq!(discount_sats(0, 4, maturity_date), 0);
         assert_eq!(discount_sats(1, 4, maturity_date), 1);
         assert_eq!(discount_sats(2, 4, maturity_date), 1);

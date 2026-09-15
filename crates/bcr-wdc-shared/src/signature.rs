@@ -1,8 +1,8 @@
+use bitcoin::secp256k1::{Keypair, Message, SECP256K1, SecretKey, schnorr::Signature};
 use bitcoin::{
     XOnlyPublicKey,
     hashes::{Hash, sha256},
 };
-use secp256k1::{Keypair, Message, SECP256K1, SecretKey, schnorr::Signature};
 
 /// Verifies that the given string was signed using schnorr by the controller of pub_key's private key
 pub fn verify_signature(

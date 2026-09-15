@@ -12,8 +12,8 @@ use bcr_wdc_shared::{
     now, signature,
     wire::MintSignature,
 };
+use bitcoin::secp256k1::{SecretKey, schnorr::Signature};
 use email_address::EmailAddress;
-use secp256k1::{SecretKey, schnorr::Signature};
 use std::sync::Arc;
 use tracing::warn;
 

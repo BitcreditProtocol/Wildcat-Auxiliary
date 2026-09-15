@@ -9,8 +9,8 @@ license.workspace = true
 bcr-common = {workspace = true}
 bitcoin = {workspace = true, features = ["serde"]}
 config.workspace = true
-chrono = {workspace = true}
 serde.workspace = true
+time = {workspace = true}
 tokio = {workspace = true, features = ["signal", "time", "macros", "rt-multi-thread"]}
 tokio-util = {version = "0.7"}
 tracing = {workspace = true, features = ["log"]}

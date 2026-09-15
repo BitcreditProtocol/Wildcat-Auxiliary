@@ -10,7 +10,7 @@ use bcr_ebill_transport::{
 use std::{env, str::FromStr};
 // ----- extra library imports
 use tokio::signal;
-use tracing::info;
+use tracing::{info, warn};
 use tracing_subscriber::{
     filter::{LevelFilter, Targets},
     prelude::*,
@@ -262,8 +262,10 @@ async fn main() {
             }
 
             // unsubscribe all, so we re-subscribe again on re-connect
-            if let Ok(cl) = nostr_client.client().await {
-                cl.unsubscribe_all().await;
+            if let Ok(cl) = nostr_client.client().await
+                && let Err(e) = cl.unsubscribe_all().await
+            {
+                warn!("Failed to unsubscribe before reconnect: {e}");
             }
         }
     });

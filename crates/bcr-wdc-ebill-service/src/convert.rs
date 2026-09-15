@@ -1,5 +1,3 @@
-// ----- standard library imports
-use std::str::FromStr;
 // ----- extra library imports
 use bcr_common::wire::{bill as wire_bill, contact as wire_contact, identity as wire_identity};
 use bcr_ebill_core::{
@@ -11,15 +9,19 @@ use bcr_ebill_core::{
     protocol::{Address, City, Country, Zip},
 };
 use thiserror::Error;
+use time::macros::format_description;
 // ----- local imports
 
 // ----- end imports
 
+pub const DATE_FORMAT: &[time::format_description::BorrowedFormatItem<'_>] =
+    format_description!("[year]-[month]-[day]");
+
 pub(crate) type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Error)]
 pub(crate) enum Error {
-    #[error("Chrono parse {0}")]
-    Chrono(#[from] chrono::ParseError),
+    #[error("Time parse {0}")]
+    Time(#[from] time::error::Parse),
     #[error("Url parse {0}")]
     Url(#[from] url::ParseError),
     #[error("ebill parse {0}")]
@@ -113,7 +115,7 @@ pub(crate) fn identity_ebill2wire(
             .date_of_birth
             .as_ref()
             .map(|d| d.as_str())
-            .map(chrono::NaiveDate::from_str)
+            .map(|d| time::Date::parse(d, DATE_FORMAT))
             .transpose()?,
         country_of_birth: input.country_of_birth.map(|c| c.to_string()),
         city_of_birth: input.city_of_birth.map(|c| c.to_string()),
@@ -262,8 +264,8 @@ pub(crate) fn billparticipants_ebill2wire(
 }
 
 pub(crate) fn billdata_ebill2wire(input: ebill_bill::BillData) -> Result<wire_bill::BillData> {
-    let issue_date = chrono::NaiveDate::from_str(input.issue_date.as_str())?;
-    let maturity_date = chrono::NaiveDate::from_str(input.maturity_date.as_str())?;
+    let issue_date = time::Date::parse(input.issue_date.as_str(), DATE_FORMAT)?;
+    let maturity_date = time::Date::parse(input.maturity_date.as_str(), DATE_FORMAT)?;
     let output = wire_bill::BillData {
         time_of_drawing: input.time_of_drawing.inner(),
         issue_date,

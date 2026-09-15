@@ -56,6 +56,7 @@ pub trait ChallengeRepository: Send + Sync {
 pub struct ChallengeDBEntry {
     pub node_id: NodeId,
     pub challenge: String,
+    #[serde(with = "time::serde::rfc3339")]
     pub created_at: TStamp,
 }
 

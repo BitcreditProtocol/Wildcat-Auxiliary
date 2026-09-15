@@ -16,7 +16,6 @@ bip39 = {workspace = true, features = ["serde"]}
 bitcoin = {workspace = true, features = ["serde"]}
 borsh.workspace = true
 config.workspace = true
-chrono = {workspace = true}
 futures.workspace = true
 reqwest = {workspace = true, features = ["stream"]}
 rustls = "0.23"
@@ -24,6 +23,7 @@ serde.workspace = true
 serde_json.workspace = true
 serde_repr.workspace = true
 thiserror.workspace = true
+time = {workspace = true}
 tokio = {workspace = true, features = ["signal", "time"]}
 tracing = {workspace = true, features = ["log"]}
 tracing-log = {workspace = true}

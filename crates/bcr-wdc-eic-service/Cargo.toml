@@ -14,17 +14,16 @@ bitcoin = {workspace = true}
 bip39 = {workspace = true}
 borsh = {workspace = true}
 borsh-derive = {workspace = true}
-chrono = {workspace = true}
 config = {workspace = true}
 email_address = {workspace = true}
 rand = {workspace = true}
 reqwest = {workspace = true, features = ["default","json"]}
-secp256k1 = {workspace = true, features = ["global-context"]}
 serde = {workspace = true}
 serde_json = {workspace = true}
 surrealdb = {workspace = true}
 thiserror = {workspace = true}
 tinytemplate = {workspace = true}
+time = {workspace = true}
 tokio = {workspace = true, features = ["signal", "rt-multi-thread"]}
 tracing = {workspace = true}
 tracing-log = {workspace = true}

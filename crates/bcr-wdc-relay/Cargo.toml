@@ -9,19 +9,20 @@ anyhow.workspace = true
 async-trait.workspace = true
 axum = { workspace = true, features = ["ws", "tokio"] }
 axum-raw-websocket = "0.8"
-chrono.workspace = true
+bitcoin.workspace = true
 clap = { version = "4.5.39", features = ["derive", "env"] }
 deadpool-postgres = "0.14"
 futures.workspace = true
-nostr = "0.44"
-nostr-relay-builder = "0.44"
+nostr = { git = "https://github.com/BitcreditProtocol/nostr.git", rev = "d60e3ebc77c7833db917c3030c145883b8f0ee62", features = ["os-rng"] }
+nostr-sdk = { git = "https://github.com/BitcreditProtocol/nostr.git", rev = "d60e3ebc77c7833db917c3030c145883b8f0ee62", features = ["local-relay"] }
 base64-url = "3"
-nostr-postgres-db = { git = "https://github.com/BitcreditProtocol/nostr-postgres-db.git", rev = "ac2b2f9a8fef12ebc5e2f07eebcc068f4d01b804" }
+nostr-postgres-db = { git = "https://github.com/BitcreditProtocol/nostr-postgres-db.git", rev = "c58d1c922b3f791cb16c6e1767955d05972412ad" }
 reqwest = { workspace = true, features = ["stream", "rustls-tls"] }
 serde.workspace = true
 serde_json.workspace = true
+time.workspace = true
 tokio.workspace = true
-tokio-postgres = { version = "0.7", features = ["with-chrono-0_4"] }
-tower-http = { version = "0.6.6", features = ["cors"] }
+tokio-postgres = { version = "0.7" }
+tower-http = { version = "0.7", features = ["cors"] }
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
