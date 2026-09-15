@@ -108,7 +108,6 @@ pub async fn validate_and_decrypt_shared_bill(
     State(ctrl): State<AppController>,
     Json(payload): Json<wire_quotes::SharedBill>,
 ) -> Result<Json<wire_quotes::BillInfo>> {
-    tracing::debug!("Received validate and decrypt shared bill request");
     let IdentityWithAll { identity, key_pair } = ctrl.identity_service.get_full_identity().await?;
 
     // check that our pub key is the receiver pub key
@@ -227,7 +226,6 @@ pub async fn validate_endorsed_bill_matches_shared_bill(
     State(ctrl): State<AppController>,
     Json(payload): Json<wire_quotes::SharedBillData>,
 ) -> Result<()> {
-    tracing::debug!("Received validate endorsed bill matches shared bill request");
     let identity = ctrl.identity_service.get_full_identity().await?;
     let keys = identity.key_pair;
     let decrypted = decode_and_decrypt_shared_bill_data(&payload.data, &keys.get_private_key())
@@ -338,7 +336,6 @@ pub async fn get_bill_payment_actions(
 pub async fn get_seed_phrase(
     State(ctrl): State<AppController>,
 ) -> Result<Json<wire_identity::SeedPhrase>> {
-    tracing::debug!("Received backup seed phrase request");
     let seed_phrase = ctrl.identity_service.get_seedphrase().await?;
     Ok(Json(wire_identity::SeedPhrase {
         seed_phrase: bip39::Mnemonic::from_str(&seed_phrase)
@@ -351,7 +348,6 @@ pub async fn recover_from_seed_phrase(
     State(ctrl): State<AppController>,
     Json(payload): Json<wire_identity::SeedPhrase>,
 ) -> Result<Json<SuccessResponse>> {
-    tracing::debug!("Received restore from seed phrase request");
     ctrl.identity_service
         .recover_from_seedphrase(&payload.seed_phrase.to_string())
         .await?;
@@ -362,7 +358,6 @@ pub async fn recover_from_seed_phrase(
 pub async fn get_identity(
     State(ctrl): State<AppController>,
 ) -> Result<Json<wire_identity::Identity>> {
-    tracing::debug!("Received get identity request");
     let my_identity = if !ctrl.identity_service.identity_exists().await {
         return Err(bcr_ebill_api::service::Error::NotFound.into());
     } else {
@@ -378,7 +373,6 @@ pub async fn create_identity(
     State(ctrl): State<AppController>,
     Json(payload): Json<wire_identity::NewIdentityPayload>,
 ) -> Result<Json<SuccessResponse>> {
-    tracing::debug!("Received create identity request");
     if ctrl.identity_service.identity_exists().await {
         return Err(crate::error::Error::IdentityAlreadyExists);
     }
@@ -427,10 +421,33 @@ pub async fn create_identity(
 }
 
 #[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl))]
+pub async fn get_bills_balance_history(
+    State(ctrl): State<AppController>,
+) -> Result<Json<wire_bill::BillBalanceResponse>> {
+    let identity = ctrl.identity_service.get_full_identity().await?;
+    let bills = ctrl
+        .bill_service
+        .get_bills(
+            &bcr_ebill_core::protocol::blockchain::bill::participant::BillParticipant::Ident(
+                bcr_ebill_core::protocol::blockchain::bill::participant::BillIdentParticipant::new(
+                    identity.identity,
+                )?,
+            ),
+            &identity.key_pair,
+        )
+        .await?;
+    let mut wbills: Vec<wire_bill::BillBalanceEntry> = bills
+        .into_iter()
+        .map(convert::bitcreditbill_balance2wire)
+        .collect::<std::result::Result<_, convert::Error>>()?;
+    wbills.sort_by_key(|a| std::cmp::Reverse(a.maturity_date));
+    Ok(Json(wire_bill::BillBalanceResponse { bills: wbills }))
+}
+
+#[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl))]
 pub async fn get_bills(
     State(ctrl): State<AppController>,
 ) -> Result<Json<wire_bill::BillsResponse<wire_bill::BitcreditBill>>> {
-    tracing::debug!("Received get bills request");
     let identity = ctrl.identity_service.get_full_identity().await?;
     let bills = ctrl
         .bill_service
@@ -455,7 +472,6 @@ pub async fn get_bill_detail(
     State(ctrl): State<AppController>,
     Path(bill_id): Path<BillId>,
 ) -> Result<Json<wire_bill::BitcreditBill>> {
-    tracing::debug!("Received get bill detail request");
     let current_timestamp = Timestamp::now();
     let identity = ctrl.identity_service.get_full_identity().await?;
     let bill_detail = ctrl
@@ -481,7 +497,6 @@ pub async fn get_bill_history(
     State(ctrl): State<AppController>,
     Path(bill_id): Path<BillId>,
 ) -> Result<Json<Vec<wire_bill::BillHistoryBlock>>> {
-    tracing::debug!("Received get bill history request");
     let current_timestamp = Timestamp::now();
     let identity = ctrl.identity_service.get_full_identity().await?;
     let bill_detail = ctrl
@@ -507,7 +522,6 @@ pub async fn sync_bill_chain(
     State(ctrl): State<AppController>,
     Json(sync_bill_payload): Json<wire_bill::ResyncBillPayload>,
 ) -> Result<Json<SuccessResponse>> {
-    tracing::debug!("Received sync bill payload");
     ctrl.notification_service
         .block_transport()
         .resync_bill_chain(
@@ -524,7 +538,6 @@ pub async fn get_bill_payment_status(
     State(ctrl): State<AppController>,
     Path(bill_id): Path<BillId>,
 ) -> Result<Json<SimplifiedBillPaymentStatus>> {
-    tracing::debug!("Received get bill payment status request");
     let current_timestamp = Timestamp::now();
     let identity = ctrl.identity_service.get_full_identity().await?;
     let bill_detail = ctrl
@@ -560,8 +573,6 @@ pub async fn get_bill_endorsements(
     State(ctrl): State<AppController>,
     Path(bill_id): Path<BillId>,
 ) -> Result<Json<Vec<wire_bill::Endorsement>>> {
-    tracing::debug!("Received get bill endorsements request");
-
     let now = Timestamp::now();
     let identity = ctrl.identity_service.get_full_identity().await?;
     let endorsements = ctrl
@@ -591,7 +602,6 @@ pub async fn get_bill_attachment(
     State(ctrl): State<AppController>,
     Path((bill_id, file_name)): Path<(BillId, String)>,
 ) -> Result<impl IntoResponse> {
-    tracing::debug!("Received get bill attachment request");
     let current_timestamp = Timestamp::now();
     let identity = ctrl.identity_service.get_full_identity().await?;
     // get bill
@@ -651,11 +661,6 @@ pub async fn get_encrypted_bill_file_from_request_to_mint(
     State(ctrl): State<AppController>,
     Query(bill_file_url_req): Query<wire_quotes::RequestEncryptedFileUrlPayload>,
 ) -> Result<impl IntoResponse> {
-    tracing::debug!(
-        "Received get encrypted bill file from request to mint, url: {}",
-        bill_file_url_req.file_url
-    );
-
     let keys = ctrl.identity_service.get_full_identity().await?.key_pair;
     let (content_type, decrypted) =
         do_get_encrypted_bill_file_from_request_to_mint(&keys, &bill_file_url_req.file_url).await?;
@@ -740,7 +745,6 @@ pub async fn prepare_request_to_pay_bill(
         wire_bill::PrepareRequestToPayBitcreditBillPayload,
     >,
 ) -> Result<Json<wire_bill::PrepareRequestToPayBitcreditBillResponse>> {
-    tracing::debug!("Received prepare request to pay bill request");
     let address_derivation_metadata = ctrl
         .bill_service
         .get_address_derivation_metadata_for_payment_request(
@@ -761,8 +765,6 @@ pub async fn request_to_pay_bill(
     State(ctrl): State<AppController>,
     Json(request_to_pay_bill_payload): Json<wire_bill::RequestToPayBitcreditBillPayload>,
 ) -> Result<Json<wire_bill::RequestToPayBitcreditBillResponse>> {
-    tracing::debug!("Received request to pay bill request");
-
     let current_timestamp = Timestamp::now();
     let IdentityWithAll { identity, key_pair } = ctrl.identity_service.get_full_identity().await?;
 
