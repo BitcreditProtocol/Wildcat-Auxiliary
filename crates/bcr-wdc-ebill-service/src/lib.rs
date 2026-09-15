@@ -198,6 +198,14 @@ pub fn routes(ctrl: AppController) -> Router {
         .route(EbillClient::GET_BILLS_EP_V1, get(web::get_bills))
         .route(EbillClient::GET_BILL_EP_V1, get(web::get_bill_detail))
         .route(
+            EbillClient::CHECK_BILL_PAYMENT_EP_V1,
+            post(web::check_bill_payment),
+        )
+        .route(
+            EbillClient::GET_BILLS_BALANCE_EP_V1,
+            get(web::get_bills_balance_history),
+        )
+        .route(
             EbillClient::GET_BILL_PAYMENT_ACTIONS_EP_V1,
             get(web::get_bill_payment_actions),
         )

@@ -47,7 +47,13 @@ pub async fn main_loop(
         let pending_quotes = quote_client.list(list_param).await?.quotes;
 
         for pending_quote in pending_quotes.iter() {
-            let quote = quote_client.lookup(pending_quote.id).await?;
+            let quote = match quote_client.lookup(pending_quote.id).await {
+                Ok(q) => q,
+                Err(e) => {
+                    tracing::error!("Failed to lookup quote {}: {e}", pending_quote.id);
+                    continue;
+                }
+            };
             let InfoReply::Pending {
                 bill, submitted, ..
             } = quote
@@ -69,7 +75,9 @@ pub async fn main_loop(
 
             // if holder did more requests in the last $retention_period than we allow, deny to avoid spam
             if last_requests.len() >= max_requests_per_retention_period {
-                quote_client.deny(pending_quote.id).await?;
+                if let Err(e) = quote_client.deny(pending_quote.id).await {
+                    tracing::error!("Failed to deny quote {}: {e}", pending_quote.id,);
+                };
                 continue;
             }
 
@@ -77,13 +85,20 @@ pub async fn main_loop(
 
             // offer the quote
             let discounted = discount_sats(bill.sum, discount_percent, bill.maturity_date);
-            let offer = quote_client
+            let offer = match quote_client
                 .offer(
                     pending_quote.id,
                     bitcoin::Amount::from_sat(discounted),
                     None,
                 )
-                .await?;
+                .await
+            {
+                Ok(o) => o,
+                Err(e) => {
+                    tracing::error!("Failed to offer quote {}: {e}", pending_quote.id,);
+                    continue;
+                }
+            };
             match offer {
                 UpdateQuoteResponse::Denied => {
                     tracing::warn!("Offer for quote {} was denied", pending_quote.id);

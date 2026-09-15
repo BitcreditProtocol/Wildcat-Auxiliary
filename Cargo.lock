@@ -675,7 +675,7 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 [[package]]
 name = "bcr-common"
 version = "0.10.0"
-source = "git+https://github.com/BitcreditProtocol/bcr-common.git?rev=72ec8b546fdc64ac93e05f29aad7116aa3047be7#72ec8b546fdc64ac93e05f29aad7116aa3047be7"
+source = "git+https://github.com/BitcreditProtocol/bcr-common.git?rev=d9e09f161d462e5a5f3896add63480cebf851d32#d9e09f161d462e5a5f3896add63480cebf851d32"
 dependencies = [
  "bip39",
  "bitcoin",
@@ -703,7 +703,7 @@ dependencies = [
 [[package]]
 name = "bcr-ebill-api"
 version = "0.5.16"
-source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=c1f14c3e4c6794a8d9508307bcc22a9085858874#c1f14c3e4c6794a8d9508307bcc22a9085858874"
+source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=b88745b6fce2f2a1e3250e5682c989d0433f50bd#b88745b6fce2f2a1e3250e5682c989d0433f50bd"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -736,7 +736,7 @@ dependencies = [
 [[package]]
 name = "bcr-ebill-core"
 version = "0.5.16"
-source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=c1f14c3e4c6794a8d9508307bcc22a9085858874#c1f14c3e4c6794a8d9508307bcc22a9085858874"
+source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=b88745b6fce2f2a1e3250e5682c989d0433f50bd#b88745b6fce2f2a1e3250e5682c989d0433f50bd"
 dependencies = [
  "ammonia",
  "bcr-common",
@@ -764,7 +764,7 @@ dependencies = [
 [[package]]
 name = "bcr-ebill-persistence"
 version = "0.5.16"
-source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=c1f14c3e4c6794a8d9508307bcc22a9085858874#c1f14c3e4c6794a8d9508307bcc22a9085858874"
+source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=b88745b6fce2f2a1e3250e5682c989d0433f50bd#b88745b6fce2f2a1e3250e5682c989d0433f50bd"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -790,7 +790,7 @@ dependencies = [
 [[package]]
 name = "bcr-ebill-transport"
 version = "0.5.16"
-source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=c1f14c3e4c6794a8d9508307bcc22a9085858874#c1f14c3e4c6794a8d9508307bcc22a9085858874"
+source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=b88745b6fce2f2a1e3250e5682c989d0433f50bd#b88745b6fce2f2a1e3250e5682c989d0433f50bd"
 dependencies = [
  "async-broadcast",
  "async-trait",

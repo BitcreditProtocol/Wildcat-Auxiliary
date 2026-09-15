@@ -77,6 +77,7 @@ async fn main() {
         .with_target("bcr_ebill_core", level_filter)
         .with_target("bcr_ebill_transport", level_filter)
         .with_target("bcr_ebill_persistence", level_filter)
+        .with_target("bcr_wdc_ebill_service", level_filter)
         .with_target("bcr_common", level_filter);
     let stdout_log = tracing_subscriber::fmt::layer()
         .with_filter(level_filter)
