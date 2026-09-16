@@ -1,5 +1,14 @@
 # 0.2.0
 
+## bcr-wdc-demo-faucet
+
+* Fix one failed deny/offer/lookup cancelling the whole loop
+
+## bcr-ebill-service
+
+* Add endpoint for `get_bills_balance_history` - to return a balance overview for bills
+* Add endpoint for `check_bill_payment` to check a bill's payment
+
 ## all services
 
 * Upgrade Dependencies

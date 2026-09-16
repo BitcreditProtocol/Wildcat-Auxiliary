@@ -408,6 +408,21 @@ pub(crate) fn billcurrentwaitingstate_ebill2wire(
     }
 }
 
+pub(crate) fn bitcreditbill_balance2wire(
+    input: bcr_ebill_core::application::bill::BitcreditBillResult,
+) -> Result<wire_bill::BillBalanceEntry> {
+    let issue_date = time::Date::parse(input.data.issue_date.as_str(), DATE_FORMAT)?;
+    let maturity_date = time::Date::parse(input.data.maturity_date.as_str(), DATE_FORMAT)?;
+    let output = wire_bill::BillBalanceEntry {
+        id: input.id,
+        issue_date,
+        maturity_date,
+        sum: input.data.sum.as_sat_string(),
+        paid: input.status.payment.paid,
+    };
+    Ok(output)
+}
+
 pub(crate) fn bitcreditbill_ebill2wire(
     input: bcr_ebill_core::application::bill::BitcreditBillResult,
 ) -> Result<wire_bill::BitcreditBill> {
