@@ -58,11 +58,15 @@ jobs:
         CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
       run: |
         set -euo pipefail
-        test "$GITHUB_REF" = refs/heads/master || exit 1
+        test "$GITHUB_REF" = refs/heads/master \
+          || { echo "::error::Nightly candidates build only from refs/heads/master (got $GITHUB_REF)"; exit 1; }
         if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
-          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
-          [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]] || exit 1
-          test "$GITHUB_SHA" = "$EXPECTED_SHA" || exit 1
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] \
+            || { echo "::error::expected_sha must be a 40-hex commit SHA (got '$EXPECTED_SHA')"; exit 1; }
+          [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]*$ ]] \
+            || { echo "::error::candidate_run_id must be a positive integer (got '$CANDIDATE_RUN_ID')"; exit 1; }
+          test "$GITHUB_SHA" = "$EXPECTED_SHA" \
+            || { echo "::error::Resolved master $GITHUB_SHA does not match the candidate's expected_sha $EXPECTED_SHA"; exit 1; }
         fi
 
     - name: Checkout code
@@ -237,7 +241,7 @@ jobs:
             data = json.loads(subprocess.check_output(["docker", "buildx", "imagetools", "inspect", image + ":" + tag, "--format", "{{json .Manifest}}"], text=True))
             digest = data.get("digest")
             if not isinstance(digest, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
-                raise SystemExit("Registry returned an invalid image digest")
+                raise SystemExit(f"{registry} returned an invalid image digest for {image}:{tag}: {digest!r}")
             references[registry] = image + "@" + digest
             with open(e["GITHUB_OUTPUT"], "a") as output:
                 output.write(f"{registry}_digest={digest}\n")
