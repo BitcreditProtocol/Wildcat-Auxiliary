@@ -79,7 +79,7 @@ class NightlyTests(unittest.TestCase):
         self.assertTrue(jobs["nightly"]["with"]["record_nightly"])
         self.assertFalse(BUILD["on"]["workflow_call"]["inputs"]["record_nightly"]["default"])
         self.assertEqual(WORKFLOW["on"]["push"]["branches"], ["master"])
-        self.assertEqual({s["name"] for s in BUILD["jobs"]["wildcat-aux-images"]["strategy"]["matrix"]["service"]}, {'bcr-wdc-relay', 'bcr-wdc-eic-service', 'bcr-wdc-ens-service', 'bcr-wdc-demo-faucet'})
+        self.assertEqual({s["name"] for s in BUILD["jobs"]["wildcat-aux-images"]["strategy"]["matrix"]["service"]}, {'bcr-wdc-relay', 'bcr-wdc-eic-service', 'bcr-wdc-ebill-service', 'bcr-wdc-ens-service', 'bcr-wdc-demo-faucet'})
         save = next(s for s in BUILD["jobs"]["wildcat-aux-images"]["steps"] if s.get("name") == "Save the image result")
         self.assertEqual(save["with"]["retention-days"], 90)
         self.assertEqual(save["with"]["if-no-files-found"], "error")
