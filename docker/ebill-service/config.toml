@@ -2,9 +2,13 @@ bind_address = "0.0.0.0:3338"
 log_level = "DEBUG"
 
 [appcfg.ebill_db]
+# surrealdb
 connection = "ws://surrealdb:8000"
 namespace = "test"
 database = "ebill"
+# postgres
+pg_connection = "postgres://postgres:password@localhost:5432/postgres"
+temp_files_path = "temp_files"
 
 [appcfg.nostr_cfg]
 relays = ["wss://relay.wildcat0.clowder-dev.minibill.tech"]
@@ -28,6 +32,7 @@ esplora_base_url = "https://esplora.minibill.tech"
 data_dir = "./"
 job_runner_initial_delay_seconds = 1
 job_runner_check_interval_seconds = 600
+create_identity_if_none_exists = false
 
 [appcfg.payment_config]
 num_confirmations_for_payment = 1

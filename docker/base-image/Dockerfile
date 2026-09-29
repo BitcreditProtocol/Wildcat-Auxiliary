@@ -1,7 +1,7 @@
 ##############################
 ## Build Rust backend
 ##############################
-FROM rust:1.91-bookworm AS rust-builder
+FROM rust:1.99-bookworm AS rust-builder
 WORKDIR /wildcat
 
 RUN apt-get update && apt-get install --quiet --no-install-recommends --no-install-suggests --yes \
