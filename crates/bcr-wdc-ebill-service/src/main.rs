@@ -7,8 +7,11 @@ use bcr_ebill_core::protocol::{
 use bcr_ebill_transport::{
     chain_keys::ChainKeyService, create_nostr_clients, create_nostr_consumer,
 };
+use std::sync::Arc;
 use std::{env, str::FromStr};
 // ----- extra library imports
+use std::fs;
+use std::path::Path;
 use tokio::signal;
 use tracing::{info, warn};
 use tracing_subscriber::{
@@ -56,6 +59,9 @@ async fn main() {
         .try_deserialize()
         .expect("Failed to parse ebill config");
 
+    ensure_temp_dir(&maincfg.appcfg.ebill_db.temp_files_path)
+        .expect("couldn't create temp files dir");
+
     // seed is acquired from environment variables
     let settings = config::Config::builder()
         .add_source(config::Environment::with_prefix("EBILL"))
@@ -87,7 +93,7 @@ async fn main() {
         .expect("tracing::subscriber::set_global_default");
 
     // create bcr_ebill_api config
-    let api_config = bcr_ebill_api::Config {
+    let api_config = Arc::new(bcr_ebill_api::Config {
         court_config: CourtConfig {
             default_url: maincfg.appcfg.court_config.default_url.clone(),
         },
@@ -114,15 +120,9 @@ async fn main() {
             )
             .expect("Invalid Mint Node Id"),
         },
-        db_config: bcr_ebill_persistence::db::SurrealDbConfig {
+        db_conf: bcr_ebill_persistence::DbConfig {
             connection_string: maincfg.appcfg.ebill_db.connection.clone(),
-            namespace: maincfg.appcfg.ebill_db.namespace.clone(),
-            database: maincfg.appcfg.ebill_db.database.clone(),
-        },
-        files_db_config: bcr_ebill_persistence::db::SurrealDbConfig {
-            connection_string: maincfg.appcfg.ebill_db.connection.clone(),
-            namespace: maincfg.appcfg.ebill_db.namespace.clone(),
-            database: maincfg.appcfg.ebill_db.database.clone(),
+            temp_files_path: maincfg.appcfg.ebill_db.temp_files_path.clone(),
         },
         payment_config: PaymentConfig {
             num_confirmations_for_payment: maincfg
@@ -130,11 +130,13 @@ async fn main() {
                 .payment_config
                 .num_confirmations_for_payment,
         },
-    };
-    bcr_ebill_api::init(api_config.clone()).expect("Could not initialize E-Bill API");
+    });
+    if api_config.esplora_base_urls.is_empty() {
+        panic!("esplora_base_urls must contain at least one URL");
+    }
 
     // initialize DB context
-    let db = bcr_ebill_api::get_db_context(&api_config)
+    let db = bcr_ebill_api::get_db_context(api_config.clone(), &keys_from_mnemonic)
         .await
         .expect("Failed to create DB context");
     // set the network and check if the configured network matches the persisted network and fail, if not
@@ -166,7 +168,7 @@ async fn main() {
 
     // set up nostr clients for existing identities
     let nostr_client = create_nostr_clients(
-        &api_config,
+        api_config.clone(),
         db.identity_store.clone(),
         db.company_store.clone(),
         db.nostr_contact_store.clone(),
@@ -176,7 +178,9 @@ async fn main() {
 
     let db_clone = db.clone();
     // set up application context
-    let app = bcr_wdc_ebill_service::AppController::new(api_config, nostr_client.clone(), db).await;
+    let app =
+        bcr_wdc_ebill_service::AppController::new(api_config.clone(), nostr_client.clone(), db)
+            .await;
 
     // create identity if it doesn't exist
     if !app.identity_service.identity_exists().await {
@@ -229,6 +233,7 @@ async fn main() {
         )),
         db_clone.clone(),
         app.mint_client.clone(),
+        api_config.clone(),
     )
     .await
     .expect("Failed to create Nostr consumer");
@@ -285,6 +290,10 @@ async fn main() {
         .await
         .expect("Failed to start server");
     nostr_handle.abort();
+}
+
+fn ensure_temp_dir(path: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(Path::new(path))
 }
 
 async fn shutdown_signal() {

@@ -1,5 +1,5 @@
 // ----- standard library imports
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 // ----- extra library imports
 use axum::{
     Router,
@@ -61,8 +61,7 @@ pub struct MintConfig {
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ConnectionConfig {
     pub connection: String,
-    pub namespace: String,
-    pub database: String,
+    pub temp_files_path: PathBuf,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -106,13 +105,13 @@ pub struct AppController {
 
 impl AppController {
     pub async fn new(
-        cfg: bcr_ebill_api::Config,
+        cfg: Arc<bcr_ebill_api::Config>,
         nostr_client: Arc<NostrClient>,
         db: bcr_ebill_api::DbContext,
     ) -> Self {
         let push_service = Arc::new(PushService::new());
         let email_client = Arc::new(EmailClient::new());
-        let mint_client = Arc::new(MintClient::new());
+        let mint_client = Arc::new(MintClient::new(cfg.clone()));
 
         let notification_service = create_transport_service(
             nostr_client,
@@ -121,6 +120,7 @@ impl AppController {
             cfg.nostr_config.relays.to_owned(),
             push_service.clone(),
             mint_client.clone(),
+            cfg.clone(),
         )
         .await
         .expect("Failed to create notification service");
@@ -134,18 +134,19 @@ impl AppController {
             db.company_store.clone(),
             db.nostr_contact_store.clone(),
             notification_service.clone(),
-            &cfg.clone(),
+            cfg.clone(),
         ));
 
         let court_client = Arc::new(CourtClient::new());
         let bill_service = Arc::new(BillService::new(
+            cfg.clone(),
             db.bill_store.clone(),
             db.bill_blockchain_store.clone(),
             db.identity_store.clone(),
             db.file_upload_store.clone(),
             file_upload_client.clone(),
             db.file_reference_store.clone(),
-            Arc::new(BitcoinClient::new()),
+            Arc::new(BitcoinClient::new(cfg.clone())),
             notification_service.clone(),
             db.identity_chain_store.clone(),
             db.company_chain_store.clone(),
@@ -167,6 +168,7 @@ impl AppController {
             email_client.clone(),
             db.email_notification_store.clone(),
             db.contact_store.clone(),
+            cfg.clone(),
         );
 
         Self {

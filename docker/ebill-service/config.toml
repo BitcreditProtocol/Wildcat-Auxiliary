@@ -2,9 +2,8 @@ bind_address = "0.0.0.0:3338"
 log_level = "DEBUG"
 
 [appcfg.ebill_db]
-connection = "ws://surrealdb:8000"
-namespace = "test"
-database = "ebill"
+connection = "postgres://postgres:password@localhost:5432/postgres"
+temp_files_path = "temp_files"
 
 [appcfg.nostr_cfg]
 relays = ["wss://relay.wildcat0.clowder-dev.minibill.tech"]
