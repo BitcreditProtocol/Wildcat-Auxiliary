@@ -1,4 +1,22 @@
 services:
+  ebill-service:
+    image: wildcat/ebill-service
+    pull_policy: never
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - EBILL_MNEMONIC=abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about
+      - EBILL__APPCFG__EBILL_DB__PG_CONNECTION=postgres://postgres:password@postgres:5432/postgres
+    volumes:
+      - ./docker/ebill-service/config.toml:/ebill-service/config.toml
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:3338/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+      start_interval: 3s
   eic-service:
     image: wildcat/eic-service
     pull_policy: never

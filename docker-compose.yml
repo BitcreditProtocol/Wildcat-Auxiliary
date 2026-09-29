@@ -1,4 +1,10 @@
 services:
+  ebill-service:
+    extends:
+      file: common-services.yml
+      service: ebill-service
+    ports:
+      - "3338:3338"
   eic-service:
     extends:
       file: common-services.yml
