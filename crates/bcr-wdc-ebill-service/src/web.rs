@@ -270,6 +270,20 @@ pub async fn validate_endorsed_bill_matches_shared_bill(
         ));
     }
 
+    // Being a historic participant or merely having the enquiry prefix is not ownership.
+    // Require the locally verified chain's last transfer to be Mint, to this Mint.
+    let bill_keys = ctrl.bill_service.get_bill_keys(&payload.bill_id).await?;
+    let mint_holder = local_bill_chain
+        .holder_is_mint(&bill_keys)
+        .map_err(|e| Error::SharedBill(format!("mint holdership: {e}")))?;
+    if mint_holder.as_ref().map(|holder| holder.node_id())
+        != Some(identity.identity.node_id.clone())
+    {
+        return Err(Error::SharedBill(
+            "Mint is not the current holder via a Mint transfer".into(),
+        ));
+    }
+
     Ok(())
 }
 
