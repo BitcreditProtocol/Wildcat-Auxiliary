@@ -124,6 +124,9 @@ async fn main() {
             namespace: maincfg.appcfg.ebill_db.namespace.clone(),
             database: maincfg.appcfg.ebill_db.database.clone(),
         },
+        db_conf: bcr_ebill_persistence::DbConfig {
+            connection_string: "postgres://postgres:password@localhost:5432/postgres".to_owned(),
+        },
         payment_config: PaymentConfig {
             num_confirmations_for_payment: maincfg
                 .appcfg
