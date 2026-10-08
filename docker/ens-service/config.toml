@@ -4,6 +4,7 @@ log_level = "DEBUG"
 [appcfg]
 host_url = "http://localhost:4343" # the domain where the service is reachable
 app_url = "http://localhost:8081" # the domain where the ebill app is hosted for this env
+wdc_dashboard_url = "http://localhost:5173" # the domain where the wildcat dashboard is hosted for this env
 
 [appcfg.email_notification_preferences]
 connection = "ws://surrealdb:8000"
