@@ -10,7 +10,7 @@ members = [
   "crates/bcr-wdc-shared",
   "crates/bcr-wdc-relay",
   "crates/bcr-wdc-ens-service",
-  "crates/bcr-wdc-ebill-service",
+  # "crates/bcr-wdc-ebill-service",
   "crates/bcr-wdc-demo-faucet",
 ]
 
@@ -18,7 +18,7 @@ members = [
 anyhow = {version = "1"}
 async-trait = {version = "0.1"}
 axum = {version = "0.8"}
-bcr-common = {git = "https://github.com/BitcreditProtocol/bcr-common.git", rev = "d9e09f161d462e5a5f3896add63480cebf851d32"}
+bcr-common = {git = "https://github.com/BitcreditProtocol/bcr-common.git", rev = "dd2364f"}
 bcr-ebill-api = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "b88745b6fce2f2a1e3250e5682c989d0433f50bd"}
 bcr-ebill-core = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "b88745b6fce2f2a1e3250e5682c989d0433f50bd"}
 bcr-ebill-transport = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "b88745b6fce2f2a1e3250e5682c989d0433f50bd"}

@@ -158,8 +158,8 @@ jobs:
             dockerfile: docker/eic-service/Dockerfile
           - name: bcr-wdc-ens-service
             dockerfile: docker/ens-service/Dockerfile
-          - name: bcr-wdc-ebill-service
-            dockerfile: docker/ebill-service/Dockerfile
+          # - name: bcr-wdc-ebill-service
+          #   dockerfile: docker/ebill-service/Dockerfile
           - name: bcr-wdc-relay
             dockerfile: docker/relay/Dockerfile
           - name: bcr-wdc-demo-faucet

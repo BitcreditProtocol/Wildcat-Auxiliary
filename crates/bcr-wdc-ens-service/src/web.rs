@@ -7,6 +7,7 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Redirect};
 use axum::{Json, extract::State};
 use axum_extra::extract::Form;
+use bcr_common::wire::notification::{NotificationRequest, NotificationResponse};
 use bcr_wdc_shared::rate_limit::RateLimiter;
 use bcr_wdc_shared::{
     signature::verify_request,
@@ -46,6 +47,15 @@ pub async fn set_email_preferences(
     ctrl.set_email_notification_preferences(&req.node_id, &req.company_node_id, &req.email)
         .await?;
     Ok(Json(SetEmailPreferencesResponse { success: true }))
+}
+
+#[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl, req))]
+pub async fn admin_notification(
+    State(ctrl): State<Arc<Service>>,
+    Json(req): Json<NotificationRequest>,
+) -> Result<Json<NotificationResponse>> {
+    ctrl.notify_admins(req).await?;
+    Ok(Json(NotificationResponse {}))
 }
 
 #[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl, req, rl))]
