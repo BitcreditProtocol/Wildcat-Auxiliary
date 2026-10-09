@@ -1,20 +1,22 @@
 use crate::{
     AppConfig,
-    email::build_email_notification_message,
+    email::{
+        admin_notification_subject, build_admin_notification_body, build_email_notification_message,
+    },
     email_preferences::{EmailNotificationPreferences, PreferencesFlags},
     error::{Error, Result},
     template::{self, PreferencesContext, PreferencesContextContent, preferences_as_content_flags},
 };
 use async_trait::async_trait;
-use bcr_common::core::NodeId;
+use bcr_common::{core::NodeId, wire::notification::NotificationRequest};
 use bcr_wdc_shared::{
     challenge::{Challenge, persistence::ChallengeRepository},
-    email::mailjet::EmailClient,
+    email::mailjet::{EmailClient, EmailMessage},
 };
 use bitcoin::secp256k1::schnorr::Signature;
 use email_address::EmailAddress;
 use std::sync::Arc;
-use tracing::{error, warn};
+use tracing::{debug, error, warn};
 use uuid::Uuid;
 
 #[async_trait]
@@ -181,6 +183,35 @@ impl Service {
             return Err(Error::SendEmail("Email sending".into()));
         }
 
+        Ok(())
+    }
+
+    pub async fn notify_admins(&self, notification: NotificationRequest) -> Result<()> {
+        let recipients = &self.cfg.admin_recipients;
+        if recipients.is_empty() {
+            debug!("No admin recipients configured - not sending admin notification");
+            return Ok(());
+        }
+        // render the body once and send it to every recipient
+        let subject = admin_notification_subject(&notification);
+        let body = build_admin_notification_body(notification, &self.cfg.wdc_dashboard_url)
+            .map_err(|e| Error::SendEmail(e.to_string()))?;
+        let mut failures = 0;
+        for recipient in recipients {
+            let msg = EmailMessage {
+                from: self.cfg.mailjet_config.sender.to_owned(),
+                to: recipient.to_owned(),
+                subject: subject.to_owned(),
+                body: body.clone(),
+            };
+            if let Err(e) = self.email_client.send(msg).await {
+                error!("Admin notification send mail error for {recipient}: {e}");
+                failures += 1;
+            }
+        }
+        if failures == recipients.len() {
+            return Err(Error::SendEmail("Email sending".into()));
+        }
         Ok(())
     }
 

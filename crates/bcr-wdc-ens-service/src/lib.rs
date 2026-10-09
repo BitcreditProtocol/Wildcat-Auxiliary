@@ -3,6 +3,7 @@ use axum::{
     extract::FromRef,
     routing::{get, post},
 };
+use bcr_common::client::admin::notification::admin_ep;
 use bcr_wdc_shared::{
     email::mailjet::{MailJetConfig, MailjetClient},
     rate_limit::RateLimiter,
@@ -27,9 +28,12 @@ pub type ProdEmailClient = MailjetClient;
 pub struct AppConfig {
     host_url: url::Url,
     app_url: url::Url,
+    wdc_dashboard_url: url::Url,
     challenges: persistence::surreal::ConnectionConfig,
     email_notification_preferences: persistence::surreal::ConnectionConfig,
     mailjet_config: MailJetConfig,
+    #[serde(default)]
+    admin_recipients: Vec<email_address::EmailAddress>,
 }
 
 #[derive(Clone, FromRef)]
@@ -66,6 +70,8 @@ impl AppController {
 
 pub fn routes(app: AppController) -> Router {
     let web = Router::new()
+        // admin endpoints
+        .route(admin_ep::NOTIFY_V1, post(web::admin_notification))
         // internal endpoint
         .route("/v1/email/preferences", post(web::set_email_preferences))
         // public endpoints
