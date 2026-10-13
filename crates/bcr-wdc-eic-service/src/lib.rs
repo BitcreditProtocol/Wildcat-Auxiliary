@@ -22,7 +22,7 @@ mod persistence;
 mod service;
 mod web;
 
-pub type ProdChallengeRepository = persistence::surreal::DBChallenges;
+pub type ProdChallengeRepository = bcr_wdc_shared::challenge::persistence::surreal::DBChallenges;
 pub type ProdEmailConfirmationRepository = persistence::surreal::DBEmails;
 pub type ProdEmailClient = MailjetClient;
 pub type ProdEnsClient = ens::Client;
@@ -30,7 +30,7 @@ pub type ProdService = service::Service;
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct AppConfig {
-    challenges: persistence::surreal::ConnectionConfig,
+    challenges: bcr_wdc_shared::challenge::persistence::surreal::ConnectionConfig,
     email_confirmations: persistence::surreal::EmailConnectionConfig,
     mailjet_config: MailJetConfig,
     pub bitcoin_network: Network,

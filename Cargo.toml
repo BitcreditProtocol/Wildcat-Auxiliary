@@ -21,8 +21,8 @@ axum = {version = "0.8"}
 bcr-common = {git = "https://github.com/BitcreditProtocol/bcr-common.git", rev = "d9e09f161d462e5a5f3896add63480cebf851d32"}
 bcr-ebill-api = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "b88745b6fce2f2a1e3250e5682c989d0433f50bd"}
 bcr-ebill-core = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "b88745b6fce2f2a1e3250e5682c989d0433f50bd"}
-bcr-ebill-transport = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "b88745b6fce2f2a1e3250e5682c989d0433f50bd"}
 bcr-ebill-persistence = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "b88745b6fce2f2a1e3250e5682c989d0433f50bd"}
+bcr-ebill-transport = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "b88745b6fce2f2a1e3250e5682c989d0433f50bd"}
 bcr-wdc-shared = {path = "./crates/bcr-wdc-shared"}
 bip39 = {version = "2"}
 bitcoin = {version = "0.32", features = ["serde"]}
@@ -37,13 +37,13 @@ secp256k1 = {version = "0.29", features = ["global-context"]}
 serde = {version = "1", features = ["derive"]}
 serde_json = {version = "1"}
 serde_repr = {version= "0.1"}
-surrealdb = {version = "2.2"}
+surrealdb = {version = "2.7"}
 thiserror = {version = "2"}
+time = {version = "0.3", features = ["serde", "formatting", "parsing", "macros"]}
 tinytemplate = {version="1.2"}
 tokio = {version = "1"}
 tracing = {version = "0.1"}
 tracing-log = {version = "0.2"}
 tracing-subscriber = {version = "0.3"}
-time = {version = "0.3", features = ["serde", "formatting", "parsing", "macros"]}
 url = {version = "2.5"}
 uuid = { version = "1", default-features = false, features = ["v4", "js"] }

@@ -6,20 +6,12 @@ use crate::{
 use anyhow::anyhow;
 use async_trait::async_trait;
 use bcr_common::core::NodeId;
-use bcr_wdc_shared::{TStamp, challenge::persistence::ChallengeRepository, now};
+use bcr_wdc_shared::{TStamp, now};
 use bitcoin::secp256k1::schnorr::Signature;
 use email_address::EmailAddress;
 use surrealdb::{Surreal, engine::any::Any};
 
 type SurrealResult<T> = std::result::Result<T, Box<surrealdb::Error>>;
-
-#[derive(Debug, Clone, Default, serde::Deserialize)]
-pub struct ConnectionConfig {
-    pub connection: String,
-    pub namespace: String,
-    pub database: String,
-    pub table: String,
-}
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
 pub struct EmailConnectionConfig {
@@ -28,35 +20,6 @@ pub struct EmailConnectionConfig {
     pub database: String,
     pub table_confirmations: String,
     pub table_registrations: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct DBChallenges {
-    db: Surreal<Any>,
-    table: String,
-}
-
-impl DBChallenges {
-    pub async fn new(cfg: ConnectionConfig) -> SurrealResult<Self> {
-        let db_connection = Surreal::<Any>::init();
-        db_connection.connect(cfg.connection).await?;
-        db_connection.use_ns(cfg.namespace).await?;
-        db_connection.use_db(cfg.database).await?;
-        Ok(Self {
-            db: db_connection,
-            table: cfg.table,
-        })
-    }
-}
-
-#[async_trait]
-impl ChallengeRepository for DBChallenges {
-    fn table(&self) -> &str {
-        &self.table
-    }
-    fn db(&self) -> &Surreal<Any> {
-        &self.db
-    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

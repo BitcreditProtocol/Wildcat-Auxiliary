@@ -18,7 +18,7 @@ mod service;
 mod template;
 mod web;
 
-pub type ProdChallengeRepository = persistence::surreal::DBChallenges;
+pub type ProdChallengeRepository = bcr_wdc_shared::challenge::persistence::surreal::DBChallenges;
 pub type ProdEmailConfirmationRepository = persistence::surreal::DBEmailNotificationPreferences;
 pub type ProdService = service::Service;
 pub type ProdEmailClient = MailjetClient;
@@ -27,7 +27,7 @@ pub type ProdEmailClient = MailjetClient;
 pub struct AppConfig {
     host_url: url::Url,
     app_url: url::Url,
-    challenges: persistence::surreal::ConnectionConfig,
+    challenges: bcr_wdc_shared::challenge::persistence::surreal::ConnectionConfig,
     email_notification_preferences: persistence::surreal::ConnectionConfig,
     mailjet_config: MailJetConfig,
 }
