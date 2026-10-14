@@ -37,6 +37,7 @@ secp256k1 = {version = "0.29", features = ["global-context"]}
 serde = {version = "1", features = ["derive"]}
 serde_json = {version = "1"}
 serde_repr = {version= "0.1"}
+sqlx = {version = "0.8", default-features = false}
 surrealdb = {version = "2.7"}
 thiserror = {version = "2"}
 time = {version = "0.3", features = ["serde", "formatting", "parsing", "macros"]}

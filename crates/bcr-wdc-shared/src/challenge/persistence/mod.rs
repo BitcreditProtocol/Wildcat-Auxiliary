@@ -21,3 +21,110 @@ pub trait ChallengeRepository: Send + Sync {
 
     async fn remove_challenge_for_node_id(&self, node_id: &NodeId) -> Result<()>;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bitcoin::{
+        Network,
+        secp256k1::{SECP256K1, SecretKey},
+    };
+
+    async fn init_surreal_db() -> surreal::DBChallenges {
+        surreal::DBChallenges::new(surreal::ConnectionConfig {
+            connection: String::from("mem://"),
+            namespace: String::from("test"),
+            database: String::from("test"),
+            table: String::from("challenges"),
+        })
+        .await
+        .expect("mem db")
+    }
+
+    fn random_node_id() -> NodeId {
+        let sk = SecretKey::new(&mut bitcoin::secp256k1::rand::thread_rng());
+        NodeId::new(sk.public_key(SECP256K1), Network::Testnet)
+    }
+
+    #[tokio::test]
+    async fn test_challenges_get_missing() {
+        challenges_get_missing(init_surreal_db().await).await;
+    }
+    async fn challenges_get_missing(db: impl ChallengeRepository) {
+        let res = db
+            .get_challenge_for_node_id(&random_node_id())
+            .await
+            .unwrap();
+        assert!(res.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_challenges_insert_and_get() {
+        challenges_insert_and_get(init_surreal_db().await).await;
+    }
+    async fn challenges_insert_and_get(db: impl ChallengeRepository) {
+        let node_id = random_node_id();
+        let challenge = Challenge::new();
+        let before = crate::now();
+        db.insert_challenge_for_node_id(&node_id, &challenge)
+            .await
+            .unwrap();
+        let (stored, created_at) = db
+            .get_challenge_for_node_id(&node_id)
+            .await
+            .unwrap()
+            .expect("challenge");
+        assert_eq!(stored, challenge);
+        // surreal stores rfc3339, which may drop sub-second precision
+        assert!(created_at >= before - time::Duration::seconds(1));
+    }
+
+    #[tokio::test]
+    async fn test_challenges_insert_overwrites() {
+        challenges_insert_overwrites(init_surreal_db().await).await;
+    }
+    async fn challenges_insert_overwrites(db: impl ChallengeRepository) {
+        let node_id = random_node_id();
+        db.insert_challenge_for_node_id(&node_id, &Challenge::new())
+            .await
+            .unwrap();
+        let second = Challenge::new();
+        db.insert_challenge_for_node_id(&node_id, &second)
+            .await
+            .unwrap();
+        let (stored, _) = db
+            .get_challenge_for_node_id(&node_id)
+            .await
+            .unwrap()
+            .expect("challenge");
+        assert_eq!(stored, second);
+    }
+
+    #[tokio::test]
+    async fn test_challenges_remove() {
+        challenges_remove(init_surreal_db().await).await;
+    }
+    async fn challenges_remove(db: impl ChallengeRepository) {
+        let node_id = random_node_id();
+        let other = random_node_id();
+        db.insert_challenge_for_node_id(&node_id, &Challenge::new())
+            .await
+            .unwrap();
+        db.insert_challenge_for_node_id(&other, &Challenge::new())
+            .await
+            .unwrap();
+        db.remove_challenge_for_node_id(&node_id).await.unwrap();
+        assert!(
+            db.get_challenge_for_node_id(&node_id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            db.get_challenge_for_node_id(&other)
+                .await
+                .unwrap()
+                .is_some()
+        );
+    }
+}

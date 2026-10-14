@@ -1,5 +1,5 @@
 use crate::{
-    email_confirmation::EmailConfirmation,
+    email,
     error::{Error, Result},
     service::EmailConfirmationRepository,
 };
@@ -9,7 +9,7 @@ use bcr_common::core::NodeId;
 use bcr_wdc_shared::{TStamp, now};
 use bitcoin::secp256k1::schnorr::Signature;
 use email_address::EmailAddress;
-use surrealdb::{Surreal, engine::any::Any};
+use surrealdb::{RecordId, Surreal, engine::any::Any};
 
 type SurrealResult<T> = std::result::Result<T, Box<surrealdb::Error>>;
 
@@ -33,7 +33,7 @@ pub struct EmailConfirmationDBEntry {
     pub created_at: TStamp,
 }
 
-impl From<EmailConfirmationDBEntry> for EmailConfirmation {
+impl From<EmailConfirmationDBEntry> for email::Confirmation {
     fn from(value: EmailConfirmationDBEntry) -> Self {
         Self {
             node_id: value.node_id,
@@ -46,8 +46,8 @@ impl From<EmailConfirmationDBEntry> for EmailConfirmation {
     }
 }
 
-impl From<EmailConfirmation> for EmailConfirmationDBEntry {
-    fn from(value: EmailConfirmation) -> Self {
+impl From<email::Confirmation> for EmailConfirmationDBEntry {
+    fn from(value: email::Confirmation) -> Self {
         Self {
             node_id: value.node_id,
             company_node_id: value.company_node_id,
@@ -67,6 +67,18 @@ pub struct EmailRegistrationDBEntry {
     pub mint_signature: Signature,
     #[serde(with = "time::serde::rfc3339")]
     pub created_at: TStamp,
+}
+
+impl From<EmailRegistrationDBEntry> for email::Registration {
+    fn from(value: EmailRegistrationDBEntry) -> Self {
+        Self {
+            node_id: value.node_id,
+            company_node_id: value.company_node_id,
+            email: value.email,
+            mint_signature: value.mint_signature,
+            created_at: value.created_at,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -134,7 +146,7 @@ impl EmailConfirmationRepository for DBEmails {
         &self,
         node_id: &NodeId,
         company_node_id: &Option<NodeId>,
-    ) -> Result<Option<EmailConfirmation>> {
+    ) -> Result<Option<email::Confirmation>> {
         let id = DBEmails::id(node_id, company_node_id);
         let res: Option<EmailConfirmationDBEntry> = self
             .db
@@ -153,7 +165,7 @@ impl EmailConfirmationRepository for DBEmails {
         let table = self.table_confirmations.clone();
         let _res: Option<EmailConfirmationDBEntry> = self
             .db
-            .query("UPDATE type::table($table) SET wrong_entries += 1 WHERE id = $id")
+            .query("UPDATE type::thing($table, $id) SET wrong_entries += 1")
             .bind(("table", table))
             .bind(("id", id))
             .await
@@ -200,5 +212,22 @@ impl EmailConfirmationRepository for DBEmails {
             .await
             .map_err(|e| Error::EmailRepository(anyhow!(e)))?;
         Ok(())
+    }
+
+    async fn get_email_registration_for_node_id(
+        &self,
+        node_id: &NodeId,
+        company_node_id: &Option<NodeId>,
+    ) -> Result<Option<email::Registration>> {
+        let rid = RecordId::from((
+            &self.table_registrations,
+            DBEmails::id(node_id, company_node_id),
+        ));
+        let res: Option<EmailRegistrationDBEntry> = self
+            .db
+            .select(rid)
+            .await
+            .map_err(|e| Error::EmailRepository(anyhow!(e)))?;
+        Ok(res.map(|r| r.into()))
     }
 }

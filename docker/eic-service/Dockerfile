@@ -12,6 +12,8 @@ RUN apt-get update \
 
 WORKDIR /eic-service
 COPY --from=rust-builder /wildcat/target/release/bcr-wdc-eic-service .
+COPY crates/bcr-wdc-shared/migrations/* ./migrations/
+COPY crates/bcr-wdc-eic-service/migrations/* ./migrations/
 
 # Expose web server port
 EXPOSE 3338

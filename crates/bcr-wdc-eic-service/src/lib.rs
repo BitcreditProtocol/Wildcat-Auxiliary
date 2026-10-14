@@ -15,7 +15,6 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 mod email;
-mod email_confirmation;
 mod ens;
 mod error;
 mod persistence;
