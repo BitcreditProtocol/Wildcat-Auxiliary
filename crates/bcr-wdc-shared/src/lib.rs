@@ -3,6 +3,7 @@ use borsh::io::{Error as BorshError, ErrorKind, Read, Write};
 use std::str::FromStr;
 
 pub mod challenge;
+pub mod db;
 pub mod email;
 pub mod rate_limit;
 pub mod signature;

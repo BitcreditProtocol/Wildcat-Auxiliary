@@ -1,7 +1,5 @@
 use crate::{
-    AppConfig,
-    email::build_email_confirmation_message,
-    email_confirmation::EmailConfirmation,
+    AppConfig, email,
     error::{Error, Result},
 };
 use async_trait::async_trait;
@@ -41,7 +39,7 @@ pub trait EmailConfirmationRepository: Send + Sync {
         &self,
         node_id: &NodeId,
         company_node_id: &Option<NodeId>,
-    ) -> Result<Option<EmailConfirmation>>;
+    ) -> Result<Option<email::Confirmation>>;
 
     async fn record_wrong_entry_for_confirmation_email_for_node_id(
         &self,
@@ -62,6 +60,12 @@ pub trait EmailConfirmationRepository: Send + Sync {
         email: &EmailAddress,
         mint_signature: &Signature,
     ) -> Result<()>;
+
+    async fn get_email_registration_for_node_id(
+        &self,
+        node_id: &NodeId,
+        company_node_id: &Option<NodeId>,
+    ) -> Result<Option<email::Registration>>;
 }
 
 pub struct Service {
@@ -123,7 +127,7 @@ impl Service {
             .await?;
 
         // build confirmation email
-        let confirmation_msg = build_email_confirmation_message(
+        let confirmation_msg = email::build_confirmation_message(
             &self.cfg.mailjet_config.logo_url,
             &self.cfg.mailjet_config.sender,
             email,

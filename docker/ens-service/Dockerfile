@@ -12,6 +12,8 @@ RUN apt-get update \
 
 WORKDIR /ens-service
 COPY --from=rust-builder /wildcat/target/release/bcr-wdc-ens-service .
+COPY crates/bcr-wdc-shared/migrations/* ./migrations/
+COPY crates/bcr-wdc-ens-service/migrations/* ./migrations/
 
 # Expose web server port
 EXPOSE 3339
