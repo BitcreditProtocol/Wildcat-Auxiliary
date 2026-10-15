@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO challenges (node_id, created_at, blob) VALUES ($1, $2, $3)\n               ON CONFLICT (node_id) DO UPDATE SET created_at = EXCLUDED.created_at, blob = EXCLUDED.blob",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Timestamptz",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f167b3a64afa456d7078175062a1c7ae78248008b36ebb6ecc1b41df54dd69eb"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM challenges WHERE node_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "159df1758e8c88c3d0e0430a7dc1dd02d49e5247face1c82a303cc18d903b1fb"
+}
