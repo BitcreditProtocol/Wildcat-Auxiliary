@@ -2,6 +2,7 @@ use anyhow::{Result, anyhow};
 use async_trait::async_trait;
 use bcr_common::core::NodeId;
 use surrealdb::{Surreal, engine::any::Any};
+use time::format_description::well_known::Rfc3339;
 
 use crate::{
     TStamp,
@@ -77,6 +78,21 @@ impl ChallengeRepository for DBChallenges {
             .db
             .delete((&self.table, node_id.to_string()))
             .await
+            .map_err(|e| anyhow!(e))?;
+        Ok(())
+    }
+
+    async fn clean_expired(&self, deadline: TStamp) -> Result<()> {
+        self.db
+            .query("DELETE type::table($table) WHERE <datetime>created_at < <datetime>$deadline")
+            .bind(("table", self.table.clone()))
+            .bind((
+                "deadline",
+                deadline.format(&Rfc3339).map_err(|e| anyhow!(e))?,
+            ))
+            .await
+            .map_err(|e| anyhow!(e))?
+            .check()
             .map_err(|e| anyhow!(e))?;
         Ok(())
     }

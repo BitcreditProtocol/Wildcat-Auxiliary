@@ -4,6 +4,7 @@ use bcr_common::core::NodeId;
 
 use crate::{TStamp, challenge::Challenge};
 
+pub mod sql;
 pub mod surreal;
 
 #[async_trait]
@@ -20,6 +21,8 @@ pub trait ChallengeRepository: Send + Sync {
     ) -> Result<Option<(Challenge, TStamp)>>;
 
     async fn remove_challenge_for_node_id(&self, node_id: &NodeId) -> Result<()>;
+
+    async fn clean_expired(&self, deadline: TStamp) -> Result<()>;
 }
 
 #[cfg(test)]
@@ -50,6 +53,11 @@ mod tests {
     async fn test_challenges_get_missing() {
         challenges_get_missing(init_surreal_db().await).await;
     }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_challenges_get_missing_sql(pool: ::sqlx::PgPool) {
+        challenges_get_missing(sql::DB::from_pool(pool)).await;
+    }
     async fn challenges_get_missing(db: impl ChallengeRepository) {
         let res = db
             .get_challenge_for_node_id(&random_node_id())
@@ -61,6 +69,11 @@ mod tests {
     #[tokio::test]
     async fn test_challenges_insert_and_get() {
         challenges_insert_and_get(init_surreal_db().await).await;
+    }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_challenges_insert_and_get_sql(pool: ::sqlx::PgPool) {
+        challenges_insert_and_get(sql::DB::from_pool(pool)).await;
     }
     async fn challenges_insert_and_get(db: impl ChallengeRepository) {
         let node_id = random_node_id();
@@ -83,6 +96,11 @@ mod tests {
     async fn test_challenges_insert_overwrites() {
         challenges_insert_overwrites(init_surreal_db().await).await;
     }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_challenges_insert_overwrites_sql(pool: ::sqlx::PgPool) {
+        challenges_insert_overwrites(sql::DB::from_pool(pool)).await;
+    }
     async fn challenges_insert_overwrites(db: impl ChallengeRepository) {
         let node_id = random_node_id();
         db.insert_challenge_for_node_id(&node_id, &Challenge::new())
@@ -101,8 +119,49 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_challenges_clean_expired() {
+        challenges_clean_expired(init_surreal_db().await).await;
+    }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_challenges_clean_expired_sql(pool: ::sqlx::PgPool) {
+        challenges_clean_expired(sql::DB::from_pool(pool)).await;
+    }
+    async fn challenges_clean_expired(db: impl ChallengeRepository) {
+        let node_id = random_node_id();
+        db.insert_challenge_for_node_id(&node_id, &Challenge::new())
+            .await
+            .unwrap();
+        // created after the deadline: kept
+        db.clean_expired(crate::now() - time::Duration::minutes(1))
+            .await
+            .unwrap();
+        assert!(
+            db.get_challenge_for_node_id(&node_id)
+                .await
+                .unwrap()
+                .is_some()
+        );
+        // created before the deadline: removed
+        db.clean_expired(crate::now() + time::Duration::minutes(1))
+            .await
+            .unwrap();
+        assert!(
+            db.get_challenge_for_node_id(&node_id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
     async fn test_challenges_remove() {
         challenges_remove(init_surreal_db().await).await;
+    }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_challenges_remove_sql(pool: ::sqlx::PgPool) {
+        challenges_remove(sql::DB::from_pool(pool)).await;
     }
     async fn challenges_remove(db: impl ChallengeRepository) {
         let node_id = random_node_id();

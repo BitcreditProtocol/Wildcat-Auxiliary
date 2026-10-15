@@ -27,6 +27,7 @@ jobs:
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: service
         ports:
           - 5432:5432
         options: >-
@@ -36,6 +37,7 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/service
+      SQLX_OFFLINE: "true"
     strategy:
       fail-fast: false
       matrix:
