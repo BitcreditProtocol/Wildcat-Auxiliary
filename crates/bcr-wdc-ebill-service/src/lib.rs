@@ -1,5 +1,5 @@
 // ----- standard library imports
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 // ----- extra library imports
 use axum::{
     Router,
@@ -8,6 +8,7 @@ use axum::{
 };
 use bcr_common::client::ebill::Client as EbillClient;
 use bcr_ebill_api::{
+    Config,
     external::{
         bitcoin::BitcoinClient,
         court::CourtClient,
@@ -23,7 +24,11 @@ use bcr_ebill_api::{
     },
 };
 use bcr_ebill_core::protocol::{Address, City, Country, Email, Name, Zip};
-use bcr_ebill_transport::{NostrClient, PushApi, PushService, create_transport_service};
+use bcr_ebill_transport::{
+    NostrClient, PushApi, PushService,
+    chain_keys::{ChainKeyService, ChainKeyServiceApi},
+    create_transport_service,
+};
 // ----- local modules
 mod convert;
 mod error;
@@ -42,6 +47,7 @@ pub struct AppConfig {
     pub job_runner_check_interval_seconds: u64,
     pub court_config: CourtConfig,
     pub dev_mode_config: DevModeConfig,
+    pub create_identity_if_none_exists: bool,
     pub identity_config: IdentityConfig,
 }
 
@@ -60,9 +66,8 @@ pub struct MintConfig {
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ConnectionConfig {
-    pub connection: String,
-    pub namespace: String,
-    pub database: String,
+    pub pg_connection: String,
+    pub temp_files_path: PathBuf,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -102,17 +107,19 @@ pub struct AppController {
     pub notification_service: Arc<dyn TransportServiceApi>,
     pub push_service: Arc<dyn PushApi>,
     pub mint_client: Arc<dyn MintClientApi>,
+    pub chain_key_service: Arc<dyn ChainKeyServiceApi>,
+    pub cfg: Arc<Config>,
 }
 
 impl AppController {
     pub async fn new(
-        cfg: bcr_ebill_api::Config,
+        cfg: Arc<Config>,
         nostr_client: Arc<NostrClient>,
         db: bcr_ebill_api::DbContext,
     ) -> Self {
         let push_service = Arc::new(PushService::new());
         let email_client = Arc::new(EmailClient::new());
-        let mint_client = Arc::new(MintClient::new());
+        let mint_client = Arc::new(MintClient::new(cfg.clone()));
 
         let notification_service = create_transport_service(
             nostr_client,
@@ -121,6 +128,7 @@ impl AppController {
             cfg.nostr_config.relays.to_owned(),
             push_service.clone(),
             mint_client.clone(),
+            cfg.clone(),
         )
         .await
         .expect("Failed to create notification service");
@@ -134,18 +142,19 @@ impl AppController {
             db.company_store.clone(),
             db.nostr_contact_store.clone(),
             notification_service.clone(),
-            &cfg.clone(),
+            cfg.clone(),
         ));
 
         let court_client = Arc::new(CourtClient::new());
         let bill_service = Arc::new(BillService::new(
+            cfg.clone(),
             db.bill_store.clone(),
             db.bill_blockchain_store.clone(),
             db.identity_store.clone(),
             db.file_upload_store.clone(),
             file_upload_client.clone(),
             db.file_reference_store.clone(),
-            Arc::new(BitcoinClient::new()),
+            Arc::new(BitcoinClient::new(cfg.clone())),
             notification_service.clone(),
             db.identity_chain_store.clone(),
             db.company_chain_store.clone(),
@@ -167,7 +176,14 @@ impl AppController {
             email_client.clone(),
             db.email_notification_store.clone(),
             db.contact_store.clone(),
+            cfg.clone(),
         );
+
+        let chain_key_service = Arc::new(ChainKeyService::new(
+            db.bill_store.clone(),
+            db.company_store.clone(),
+            db.identity_store.clone(),
+        ));
 
         Self {
             contact_service,
@@ -176,6 +192,8 @@ impl AppController {
             notification_service,
             push_service,
             mint_client,
+            chain_key_service,
+            cfg,
         }
     }
 }

@@ -1,3 +1,18 @@
+# 0.3.0
+
+* Upgraded E-Bill-Service to E-Bill 0.6.0
+    * This includes a database migration from SurrealDB to Postgres
+        * Migration can be done by
+            * Deploying the service
+                * `create_identity_if_none_exists` should be set to `false` (the default), so no identity is created by default
+            * Call `PUT /v1/admin/identity/seed/recover` with the correct `seed_phrase`
+                * This will start the recovery process
+            * Once restoration is done, check `/v1/admin/identity/detail` if everything is correct
+            * Restart the pod/service (important! otherwise, the nostr connection isn't properly set up)
+* Add flag `appcfg.create_identity_if_none_exists` to control if an identity should be created by default, if none exists
+    * If it's a new, fresh instance (e.g. e2e tests, local setup, new cluster) - this should be set to `true`
+    * Otherwise, if the instance is supposed to be recovered from a seed phrase, it should be set to the default `false`
+
 # 0.2.0
 
 ## bcr-wdc-demo-faucet

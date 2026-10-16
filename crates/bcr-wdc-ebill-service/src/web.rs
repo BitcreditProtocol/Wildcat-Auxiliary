@@ -13,7 +13,10 @@ use bcr_common::{
 };
 use bcr_ebill_api::{
     constants::MAX_DOCUMENT_FILE_SIZE_BYTES,
-    service::{file_upload_service::detect_content_type_for_bytes, transport_service::ResyncMode},
+    service::{
+        file_upload_service::detect_content_type_for_bytes,
+        transport_service::{ResyncMode, restore::RestoreAccountApi},
+    },
 };
 use bcr_ebill_core::{
     application::identity::IdentityWithAll,
@@ -33,6 +36,7 @@ use bcr_ebill_core::{
         crypto::{self, BcrKeys},
     },
 };
+use bcr_ebill_transport::create_restore_account_service;
 use bitcoin::{
     base58,
     hashes::{Hash, sha256::Hash as HashSha256},
@@ -348,9 +352,23 @@ pub async fn recover_from_seed_phrase(
     State(ctrl): State<AppController>,
     Json(payload): Json<wire_identity::SeedPhrase>,
 ) -> Result<Json<SuccessResponse>> {
+    tracing::info!("Starting to restore from seed phrase");
     ctrl.identity_service
         .recover_from_seedphrase(&payload.seed_phrase.to_string())
         .await?;
+
+    let keys = ctrl.identity_service.get_keys().await?;
+    let recovery_service = create_restore_account_service(
+        ctrl.cfg.clone(),
+        &keys,
+        ctrl.chain_key_service.clone(),
+        ctrl.contact_service.clone(),
+        ctrl.push_service.clone(),
+        ctrl.mint_client.clone(),
+    )
+    .await?;
+    recovery_service.restore_account().await?;
+    tracing::info!("Restoration Complete");
     Ok(Json(SuccessResponse::default()))
 }
 
