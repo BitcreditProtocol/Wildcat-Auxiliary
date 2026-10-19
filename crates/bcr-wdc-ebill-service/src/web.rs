@@ -438,7 +438,7 @@ pub async fn get_bills_balance_history(
         .await?;
     let mut wbills: Vec<wire_bill::BillBalanceEntry> = bills
         .into_iter()
-        .map(convert::bitcreditbill_balance2wire)
+        .map(convert::bitcreditbill_balance2wire).filter(|entry| entry.paid == false)
         .collect::<std::result::Result<_, convert::Error>>()?;
     wbills.sort_by_key(|a| std::cmp::Reverse(a.maturity_date));
     Ok(Json(wire_bill::BillBalanceResponse { bills: wbills }))
