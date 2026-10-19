@@ -19,7 +19,7 @@ use bcr_ebill_api::{
     },
 };
 use bcr_ebill_core::{
-    application::identity::IdentityWithAll,
+    application::{bill::BillPaymentState, identity::IdentityWithAll},
     protocol::{
         City, Country, Currency, Date, Email, Identification, Name, ProtocolValidationError,
         SchnorrSignature, Sha256Hash, Timestamp,
@@ -456,6 +456,12 @@ pub async fn get_bills_balance_history(
         .await?;
     let mut wbills: Vec<wire_bill::BillBalanceEntry> = bills
         .into_iter()
+        .filter(|eb| {
+            matches!(eb.state.payment, BillPaymentState::None)
+                || matches!(eb.state.payment, BillPaymentState::Requested(_))
+                || matches!(eb.state.payment, BillPaymentState::Expired(_))
+                || matches!(eb.state.payment, BillPaymentState::Rejected(_))
+        })
         .map(convert::bitcreditbill_balance2wire)
         .collect::<std::result::Result<_, convert::Error>>()?;
     wbills.sort_by_key(|a| std::cmp::Reverse(a.maturity_date));
