@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO email_confirmations (node_id, company_node_id, wrong_entries, created_at, blob)\n               VALUES ($1, $2, 0, $3, $4)\n               ON CONFLICT (node_id, company_node_id) DO UPDATE\n               SET wrong_entries = 0, created_at = EXCLUDED.created_at, blob = EXCLUDED.blob",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6228d8f31e21329423d6e5a0f26c7ba467d332fa0da8390d02ef7456395c64c6"
+}

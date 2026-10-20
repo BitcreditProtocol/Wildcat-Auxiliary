@@ -20,6 +20,7 @@ rand = {workspace = true}
 reqwest = {workspace = true, features = ["default","json"]}
 serde = {workspace = true}
 serde_json = {workspace = true}
+sqlx = {workspace = true, features = ["runtime-tokio", "postgres", "macros", "migrate", "json", "time"]}
 surrealdb = {workspace = true}
 thiserror = {workspace = true}
 tinytemplate = {workspace = true}

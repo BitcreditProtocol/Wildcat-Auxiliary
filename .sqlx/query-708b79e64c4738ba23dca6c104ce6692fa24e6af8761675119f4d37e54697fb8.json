@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE email_confirmations SET wrong_entries = wrong_entries + 1\n               WHERE node_id = $1 AND company_node_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "708b79e64c4738ba23dca6c104ce6692fa24e6af8761675119f4d37e54697fb8"
+}
