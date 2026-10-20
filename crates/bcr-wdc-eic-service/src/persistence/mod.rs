@@ -1,3 +1,6 @@
+// not wired into the service yet: only reached by the tests
+#[allow(dead_code)]
+pub mod sql;
 pub mod surreal;
 
 #[cfg(test)]
@@ -40,7 +43,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_confirmations_insert_and_get() {
-        confirmations_insert_and_get(init_surreal_db().await).await;
+        let db = init_surreal_db().await;
+        confirmations_insert_and_get(db).await;
+    }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_confirmations_insert_and_get_sql(pool: ::sqlx::PgPool) {
+        let db = sql::DB::from_pool(pool);
+        confirmations_insert_and_get(db).await;
     }
     async fn confirmations_insert_and_get(db: impl EmailConfirmationRepository) {
         let node_id = random_node_id();
@@ -68,7 +78,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_confirmations_company_key_is_distinct() {
-        confirmations_company_key_is_distinct(init_surreal_db().await).await;
+        let db = init_surreal_db().await;
+        confirmations_company_key_is_distinct(db).await;
+    }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_confirmations_company_key_is_distinct_sql(pool: ::sqlx::PgPool) {
+        let db = sql::DB::from_pool(pool);
+        confirmations_company_key_is_distinct(db).await;
     }
     async fn confirmations_company_key_is_distinct(db: impl EmailConfirmationRepository) {
         let node_id = random_node_id();
@@ -96,7 +113,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_confirmations_insert_overwrites_and_resets_wrong_entries() {
-        confirmations_insert_overwrites_and_resets_wrong_entries(init_surreal_db().await).await;
+        let db = init_surreal_db().await;
+        confirmations_insert_overwrites_and_resets_wrong_entries(db).await;
+    }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_confirmations_insert_overwrites_and_resets_wrong_entries_sql(
+        pool: ::sqlx::PgPool,
+    ) {
+        let db = sql::DB::from_pool(pool);
+        confirmations_insert_overwrites_and_resets_wrong_entries(db).await;
     }
     async fn confirmations_insert_overwrites_and_resets_wrong_entries(
         db: impl EmailConfirmationRepository,
@@ -123,7 +149,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_confirmations_record_wrong_entry() {
-        confirmations_record_wrong_entry(init_surreal_db().await).await;
+        let db = init_surreal_db().await;
+        confirmations_record_wrong_entry(db).await;
+    }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_confirmations_record_wrong_entry_sql(pool: ::sqlx::PgPool) {
+        let db = sql::DB::from_pool(pool);
+        confirmations_record_wrong_entry(db).await;
     }
     async fn confirmations_record_wrong_entry(db: impl EmailConfirmationRepository) {
         let node_id = random_node_id();
@@ -166,7 +199,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_confirmations_remove() {
-        confirmations_remove(init_surreal_db().await).await;
+        let db = init_surreal_db().await;
+        confirmations_remove(db).await;
+    }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_confirmations_remove_sql(pool: ::sqlx::PgPool) {
+        let db = sql::DB::from_pool(pool);
+        confirmations_remove(db).await;
     }
     async fn confirmations_remove(db: impl EmailConfirmationRepository) {
         let node_id = random_node_id();
@@ -200,7 +240,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_registrations_insert_and_get() {
-        registrations_insert_and_get(init_surreal_db().await).await;
+        let db = init_surreal_db().await;
+        registrations_insert_and_get(db).await;
+    }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_registrations_insert_and_get_sql(pool: ::sqlx::PgPool) {
+        let db = sql::DB::from_pool(pool);
+        registrations_insert_and_get(db).await;
     }
     async fn registrations_insert_and_get(db: impl EmailConfirmationRepository) {
         let node_id = random_node_id();
@@ -234,7 +281,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_registrations_insert_overwrites() {
-        registrations_insert_overwrites(init_surreal_db().await).await;
+        let db = init_surreal_db().await;
+        registrations_insert_overwrites(db).await;
+    }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_registrations_insert_overwrites_sql(pool: ::sqlx::PgPool) {
+        let db = sql::DB::from_pool(pool);
+        registrations_insert_overwrites(db).await;
     }
     async fn registrations_insert_overwrites(db: impl EmailConfirmationRepository) {
         let node_id = random_node_id();

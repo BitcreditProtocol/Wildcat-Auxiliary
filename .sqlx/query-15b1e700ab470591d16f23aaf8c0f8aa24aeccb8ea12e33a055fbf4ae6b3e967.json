@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM email_confirmations WHERE node_id = $1 AND company_node_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "15b1e700ab470591d16f23aaf8c0f8aa24aeccb8ea12e33a055fbf4ae6b3e967"
+}

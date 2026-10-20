@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT created_at, blob AS \"blob: Json<RegistrationBlob>\"\n               FROM email_registrations WHERE node_id = $1 AND company_node_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 1,
+        "name": "blob: Json<RegistrationBlob>",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "71fb79d604f1cb963ff6fa76d54fd373e42722354051fdacf5ad11ac6548ebd6"
+}
