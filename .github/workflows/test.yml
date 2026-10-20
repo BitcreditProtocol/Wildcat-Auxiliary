@@ -90,7 +90,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/master' }}
 
       - name: Install grcov
-        run: cargo install grcov
+        run: cargo install --locked grcov
 
       - name: Install sqlx-cli
         run: cargo install sqlx-cli --no-default-features --features postgres,rustls --locked
