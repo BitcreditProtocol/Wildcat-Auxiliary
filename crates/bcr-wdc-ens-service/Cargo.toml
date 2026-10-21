@@ -19,6 +19,7 @@ config.workspace = true
 email_address = {workspace = true}
 serde.workspace = true
 serde_json = {workspace = true}
+sqlx = {workspace = true, features = ["runtime-tokio", "postgres", "macros", "migrate", "json", "time", "uuid"]}
 surrealdb = {workspace = true}
 thiserror = {workspace = true}
 tinytemplate = {workspace = true}
