@@ -51,7 +51,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_challenges_get_missing() {
-        challenges_get_missing(init_surreal_db().await).await;
+        let db = init_surreal_db().await;
+        challenges_get_missing(db).await;
     }
     #[sqlx::test(migrations = "./migrations")]
     #[ignore = "requires DATABASE_URL with CREATEDB permission"]
@@ -68,7 +69,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_challenges_insert_and_get() {
-        challenges_insert_and_get(init_surreal_db().await).await;
+        let db = init_surreal_db().await;
+        challenges_insert_and_get(db).await;
     }
     #[sqlx::test(migrations = "./migrations")]
     #[ignore = "requires DATABASE_URL with CREATEDB permission"]
@@ -94,7 +96,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_challenges_insert_overwrites() {
-        challenges_insert_overwrites(init_surreal_db().await).await;
+        let db = init_surreal_db().await;
+        challenges_insert_overwrites(db).await;
     }
     #[sqlx::test(migrations = "./migrations")]
     #[ignore = "requires DATABASE_URL with CREATEDB permission"]
@@ -120,7 +123,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_challenges_clean_expired() {
-        challenges_clean_expired(init_surreal_db().await).await;
+        let db = init_surreal_db().await;
+        challenges_clean_expired(db).await;
     }
     #[sqlx::test(migrations = "./migrations")]
     #[ignore = "requires DATABASE_URL with CREATEDB permission"]
@@ -156,7 +160,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_challenges_remove() {
-        challenges_remove(init_surreal_db().await).await;
+        let db = init_surreal_db().await;
+        challenges_remove(db).await;
     }
     #[sqlx::test(migrations = "./migrations")]
     #[ignore = "requires DATABASE_URL with CREATEDB permission"]
