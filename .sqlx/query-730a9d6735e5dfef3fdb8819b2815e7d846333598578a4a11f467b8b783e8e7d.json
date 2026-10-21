@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE email_notification_preferences SET enabled = $2, preferences = $3\n               WHERE pref_token = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "730a9d6735e5dfef3fdb8819b2815e7d846333598578a4a11f467b8b783e8e7d"
+}

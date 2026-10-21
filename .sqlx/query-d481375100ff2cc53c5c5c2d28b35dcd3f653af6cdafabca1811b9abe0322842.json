@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT node_id, company_node_id, pref_token, enabled, preferences, blob AS \"blob: Json<Blob>\"\n               FROM email_notification_preferences WHERE pref_token = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "node_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "company_node_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "pref_token",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "enabled",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "preferences",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "blob: Json<Blob>",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d481375100ff2cc53c5c5c2d28b35dcd3f653af6cdafabca1811b9abe0322842"
+}

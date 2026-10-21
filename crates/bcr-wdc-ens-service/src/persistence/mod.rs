@@ -1,3 +1,6 @@
+// not wired into the service yet: only reached by the tests
+#[allow(dead_code)]
+pub mod sql;
 pub mod surreal;
 
 #[cfg(test)]
@@ -40,6 +43,12 @@ mod tests {
         let db = init_surreal_db().await;
         prefs_get_missing(db).await;
     }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_prefs_get_missing_sql(pool: ::sqlx::PgPool) {
+        let db = sql::DB::from_pool(pool);
+        prefs_get_missing(db).await;
+    }
     async fn prefs_get_missing(db: impl EmailNotificationPreferencesRepository) {
         assert!(
             db.get_preferences_for_node_id(&random_node_id(), &None)
@@ -58,6 +67,12 @@ mod tests {
     #[tokio::test]
     async fn test_prefs_set_and_get() {
         let db = init_surreal_db().await;
+        prefs_set_and_get(db).await;
+    }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_prefs_set_and_get_sql(pool: ::sqlx::PgPool) {
+        let db = sql::DB::from_pool(pool);
         prefs_set_and_get(db).await;
     }
     async fn prefs_set_and_get(db: impl EmailNotificationPreferencesRepository) {
@@ -84,6 +99,12 @@ mod tests {
     #[tokio::test]
     async fn test_prefs_company_key_is_distinct() {
         let db = init_surreal_db().await;
+        prefs_company_key_is_distinct(db).await;
+    }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_prefs_company_key_is_distinct_sql(pool: ::sqlx::PgPool) {
+        let db = sql::DB::from_pool(pool);
         prefs_company_key_is_distinct(db).await;
     }
     async fn prefs_company_key_is_distinct(db: impl EmailNotificationPreferencesRepository) {
@@ -134,6 +155,12 @@ mod tests {
         let db = init_surreal_db().await;
         prefs_set_overwrites(db).await;
     }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_prefs_set_overwrites_sql(pool: ::sqlx::PgPool) {
+        let db = sql::DB::from_pool(pool);
+        prefs_set_overwrites(db).await;
+    }
     async fn prefs_set_overwrites(db: impl EmailNotificationPreferencesRepository) {
         let node_id = random_node_id();
         let old_token = Uuid::new_v4();
@@ -180,6 +207,12 @@ mod tests {
         let db = init_surreal_db().await;
         prefs_get_for_token(db).await;
     }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_prefs_get_for_token_sql(pool: ::sqlx::PgPool) {
+        let db = sql::DB::from_pool(pool);
+        prefs_get_for_token(db).await;
+    }
     async fn prefs_get_for_token(db: impl EmailNotificationPreferencesRepository) {
         let first = random_node_id();
         let second = random_node_id();
@@ -218,6 +251,12 @@ mod tests {
     #[tokio::test]
     async fn test_prefs_update_for_token() {
         let db = init_surreal_db().await;
+        prefs_update_for_token(db).await;
+    }
+    #[sqlx::test(migrations = "./migrations")]
+    #[ignore = "requires DATABASE_URL with CREATEDB permission"]
+    async fn test_prefs_update_for_token_sql(pool: ::sqlx::PgPool) {
+        let db = sql::DB::from_pool(pool);
         prefs_update_for_token(db).await;
     }
     async fn prefs_update_for_token(db: impl EmailNotificationPreferencesRepository) {
