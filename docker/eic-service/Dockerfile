@@ -12,6 +12,7 @@ RUN apt-get update \
 
 WORKDIR /eic-service
 COPY --from=rust-builder /wildcat/target/release/bcr-wdc-eic-service .
+COPY --from=rust-builder /wildcat/target/release/bcr-wdc-eic-migrate ./migrate
 COPY crates/bcr-wdc-shared/migrations/* ./migrations/
 COPY crates/bcr-wdc-eic-service/migrations/* ./migrations/
 

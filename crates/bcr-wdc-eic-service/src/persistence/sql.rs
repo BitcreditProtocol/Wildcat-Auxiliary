@@ -53,6 +53,42 @@ impl DB {
             .map(|cn| cn.to_string())
             .unwrap_or_default()
     }
+
+    /// Inserts registrations copied from SurrealDB, keeping their `created_at`.
+    /// Strict insert in a single transaction: fails if any registration already exists.
+    pub async fn import_email_registrations(
+        &self,
+        registrations: &[email::Registration],
+    ) -> Result<u64> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| Error::EmailRepository(anyhow!(e)))?;
+        let mut inserted = 0;
+        for registration in registrations {
+            let blob = Json(RegistrationBlob::V1(RegistrationBlobV1 {
+                email: registration.email.to_string(),
+                mint_signature: registration.mint_signature.to_string(),
+            }));
+            let res = sqlx::query!(
+                r#"INSERT INTO email_registrations (node_id, company_node_id, created_at, blob)
+                   VALUES ($1, $2, $3, $4)"#,
+                registration.node_id.to_string(),
+                DB::company_key(&registration.company_node_id),
+                registration.created_at,
+                blob as _,
+            )
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| Error::EmailRepository(anyhow!(e)))?;
+            inserted += res.rows_affected();
+        }
+        tx.commit()
+            .await
+            .map_err(|e| Error::EmailRepository(anyhow!(e)))?;
+        Ok(inserted)
+    }
 }
 
 fn parse_email(email: &str) -> Result<EmailAddress> {

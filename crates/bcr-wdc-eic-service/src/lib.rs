@@ -17,9 +17,11 @@ use tokio::sync::Mutex;
 mod email;
 mod ens;
 mod error;
-mod persistence;
+pub mod persistence;
 mod service;
 mod web;
+
+pub use service::EmailConfirmationRepository;
 
 pub type ProdChallengeRepository = bcr_wdc_shared::challenge::persistence::surreal::DBChallenges;
 pub type ProdEmailConfirmationRepository = persistence::surreal::DBEmails;
@@ -27,10 +29,21 @@ pub type ProdEmailClient = MailjetClient;
 pub type ProdEnsClient = ens::Client;
 pub type ProdService = service::Service;
 
+/// Configuration shared by the service and the migrate binary
+#[derive(Debug, serde::Deserialize)]
+pub struct MainConfig {
+    pub bind_address: std::net::SocketAddr,
+    pub appcfg: AppConfig,
+    pub log_level: String,
+}
+
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct AppConfig {
     challenges: bcr_wdc_shared::challenge::persistence::surreal::ConnectionConfig,
-    email_confirmations: persistence::surreal::EmailConnectionConfig,
+    pub email_confirmations: persistence::surreal::EmailConnectionConfig,
+    /// PostgreSQL; `max_connections == 0` (the default) means not configured
+    #[serde(default)]
+    pub repository_new: bcr_wdc_shared::db::sql::DBConnConfig,
     mailjet_config: MailJetConfig,
     pub bitcoin_network: Network,
     ens: EnsRestConfig,

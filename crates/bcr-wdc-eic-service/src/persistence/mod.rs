@@ -1,12 +1,10 @@
-// not wired into the service yet: only reached by the tests
-#[allow(dead_code)]
 pub mod sql;
 pub mod surreal;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::service::EmailConfirmationRepository;
+    use crate::{error::Error, service::EmailConfirmationRepository};
     use bcr_common::core::NodeId;
     use bitcoin::{
         Network,
@@ -311,5 +309,91 @@ mod tests {
             .expect("registration");
         assert_eq!(res.email, email("c@d.cr"));
         assert_eq!(res.mint_signature, signature);
+    }
+
+    #[tokio::test]
+    async fn test_mark_migrated_sets_marker() {
+        let db = init_surreal_db().await;
+        assert!(!db.is_migrated().await.unwrap());
+        db.mark_migrated().await.unwrap();
+        assert!(db.is_migrated().await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_writes_refused_once_migrated() {
+        let db = init_surreal_db().await;
+        let node_id = random_node_id();
+        let signature = random_signature();
+        db.insert_confirmation_email_for_node_id(&node_id, &None, &email("a@b.cr"), "111111")
+            .await
+            .unwrap();
+        db.insert_email_registration_for_node_id(&node_id, &None, &email("a@b.cr"), &signature)
+            .await
+            .unwrap();
+        db.mark_migrated().await.unwrap();
+
+        let res = db
+            .insert_confirmation_email_for_node_id(&node_id, &None, &email("c@d.cr"), "222222")
+            .await;
+        assert!(matches!(res, Err(Error::Migrated)));
+        let res = db
+            .record_wrong_entry_for_confirmation_email_for_node_id(&node_id, &None)
+            .await;
+        assert!(matches!(res, Err(Error::Migrated)));
+        let res = db
+            .remove_confirmation_email_for_node_id(&node_id, &None)
+            .await;
+        assert!(matches!(res, Err(Error::Migrated)));
+        let res = db
+            .insert_email_registration_for_node_id(&node_id, &None, &email("c@d.cr"), &signature)
+            .await;
+        assert!(matches!(res, Err(Error::Migrated)));
+
+        // reads still work and nothing changed
+        let confirmation = db
+            .get_confirmation_email_for_node_id(&node_id, &None)
+            .await
+            .unwrap()
+            .expect("confirmation");
+        assert_eq!(confirmation.confirmation_code, "111111");
+        assert_eq!(confirmation.wrong_entries, 0);
+        let registration = db
+            .get_email_registration_for_node_id(&node_id, &None)
+            .await
+            .unwrap()
+            .expect("registration");
+        assert_eq!(registration.email, email("a@b.cr"));
+    }
+
+    #[tokio::test]
+    async fn test_dump_email_registrations() {
+        let db = init_surreal_db().await;
+        assert!(db.dump_email_registrations().await.unwrap().is_empty());
+        let node_id = random_node_id();
+        let company = Some(random_node_id());
+        db.insert_email_registration_for_node_id(
+            &node_id,
+            &None,
+            &email("a@b.cr"),
+            &random_signature(),
+        )
+        .await
+        .unwrap();
+        db.insert_email_registration_for_node_id(
+            &node_id,
+            &company,
+            &email("c@d.cr"),
+            &random_signature(),
+        )
+        .await
+        .unwrap();
+        let mut dumped = db.dump_email_registrations().await.unwrap();
+        dumped.sort_by_key(|r| r.company_node_id.is_some());
+        assert_eq!(dumped.len(), 2);
+        assert_eq!(dumped[0].node_id, node_id);
+        assert_eq!(dumped[0].company_node_id, None);
+        assert_eq!(dumped[0].email, email("a@b.cr"));
+        assert_eq!(dumped[1].company_node_id, company);
+        assert_eq!(dumped[1].email, email("c@d.cr"));
     }
 }

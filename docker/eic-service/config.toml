@@ -20,6 +20,10 @@ database = "eic"
 table_confirmations = "email_confirmations"
 table_registrations = "email_registrations"
 
+[appcfg.repository_new]
+connection = "postgres://postgres:password@postgres:5432/eic"
+max_connections = 0 # PostgreSQL is not used while 0; the migrate binary needs > 0 (the database must exist)
+
 [appcfg.mailjet_config]
 sender = "notifications@bit.cr"
 url = "https://api.mailjet.com"
