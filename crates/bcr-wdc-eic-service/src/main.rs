@@ -1,17 +1,11 @@
 use bcr_common::core::NodeId;
+use bcr_wdc_eic_service::MainConfig;
 use bitcoin::secp256k1::{SECP256K1, SecretKey};
 use std::env;
 use std::str::FromStr;
 use tokio::signal;
 use tracing::info;
 use tracing_subscriber::{filter::LevelFilter, prelude::*};
-
-#[derive(Debug, serde::Deserialize)]
-struct MainConfig {
-    bind_address: std::net::SocketAddr,
-    appcfg: bcr_wdc_eic_service::AppConfig,
-    log_level: String,
-}
 
 #[derive(Debug, serde::Deserialize)]
 struct SeedConfig {

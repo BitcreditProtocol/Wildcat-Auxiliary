@@ -15,4 +15,12 @@ pub mod sql {
             .connect(&cfg.connection)
             .await
     }
+
+    /// Folder the Dockerfiles fill with the shared + service migrations
+    const MIGRATIONS_PATH: &str = "./migrations";
+
+    pub async fn run_migrations(pool: &PgPool) -> Result<(), sqlx::migrate::MigrateError> {
+        let migrator = sqlx::migrate::Migrator::new(std::path::Path::new(MIGRATIONS_PATH)).await?;
+        migrator.run(pool).await
+    }
 }

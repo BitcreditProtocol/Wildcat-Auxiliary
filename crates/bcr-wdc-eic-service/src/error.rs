@@ -27,6 +27,8 @@ pub enum Error {
     SignedRequest(String),
     #[error("RateLimit error")]
     RateLimit,
+    #[error("SurrealDB is migrated, read-only")]
+    Migrated,
 }
 
 impl axum::response::IntoResponse for Error {
@@ -46,6 +48,7 @@ impl axum::response::IntoResponse for Error {
                 StatusCode::TOO_MANY_REQUESTS,
                 String::from("Please try again later"),
             ),
+            Error::Migrated => (StatusCode::SERVICE_UNAVAILABLE, String::new()),
         };
         resp.into_response()
     }
