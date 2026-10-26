@@ -1,7 +1,4 @@
-// not wired into the service yet: only reached by the tests
-#[allow(dead_code)]
 pub mod sql;
-pub mod surreal;
 
 #[cfg(test)]
 mod tests {
@@ -18,17 +15,6 @@ mod tests {
     use std::str::FromStr;
     use uuid::Uuid;
 
-    async fn init_surreal_db() -> surreal::DBEmailNotificationPreferences {
-        surreal::DBEmailNotificationPreferences::new(surreal::ConnectionConfig {
-            connection: String::from("mem://"),
-            namespace: String::from("test"),
-            database: String::from("test"),
-            table: String::from("email_notification_preferences"),
-        })
-        .await
-        .expect("mem db")
-    }
-
     fn random_node_id() -> NodeId {
         let sk = SecretKey::new(&mut bitcoin::secp256k1::rand::thread_rng());
         NodeId::new(sk.public_key(SECP256K1), Network::Testnet)
@@ -38,14 +24,9 @@ mod tests {
         EmailAddress::from_str(s).unwrap()
     }
 
-    #[tokio::test]
-    async fn test_prefs_get_missing() {
-        let db = init_surreal_db().await;
-        prefs_get_missing(db).await;
-    }
     #[sqlx::test(migrations = "./migrations")]
     #[ignore = "requires DATABASE_URL with CREATEDB permission"]
-    async fn test_prefs_get_missing_sql(pool: ::sqlx::PgPool) {
+    async fn test_prefs_get_missing(pool: ::sqlx::PgPool) {
         let db = sql::DB::from_pool(pool);
         prefs_get_missing(db).await;
     }
@@ -64,14 +45,9 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn test_prefs_set_and_get() {
-        let db = init_surreal_db().await;
-        prefs_set_and_get(db).await;
-    }
     #[sqlx::test(migrations = "./migrations")]
     #[ignore = "requires DATABASE_URL with CREATEDB permission"]
-    async fn test_prefs_set_and_get_sql(pool: ::sqlx::PgPool) {
+    async fn test_prefs_set_and_get(pool: ::sqlx::PgPool) {
         let db = sql::DB::from_pool(pool);
         prefs_set_and_get(db).await;
     }
@@ -96,14 +72,9 @@ mod tests {
         assert_eq!(res.pref_token, token);
     }
 
-    #[tokio::test]
-    async fn test_prefs_company_key_is_distinct() {
-        let db = init_surreal_db().await;
-        prefs_company_key_is_distinct(db).await;
-    }
     #[sqlx::test(migrations = "./migrations")]
     #[ignore = "requires DATABASE_URL with CREATEDB permission"]
-    async fn test_prefs_company_key_is_distinct_sql(pool: ::sqlx::PgPool) {
+    async fn test_prefs_company_key_is_distinct(pool: ::sqlx::PgPool) {
         let db = sql::DB::from_pool(pool);
         prefs_company_key_is_distinct(db).await;
     }
@@ -150,14 +121,9 @@ mod tests {
         assert_eq!(corporate.pref_token, company_token);
     }
 
-    #[tokio::test]
-    async fn test_prefs_set_overwrites() {
-        let db = init_surreal_db().await;
-        prefs_set_overwrites(db).await;
-    }
     #[sqlx::test(migrations = "./migrations")]
     #[ignore = "requires DATABASE_URL with CREATEDB permission"]
-    async fn test_prefs_set_overwrites_sql(pool: ::sqlx::PgPool) {
+    async fn test_prefs_set_overwrites(pool: ::sqlx::PgPool) {
         let db = sql::DB::from_pool(pool);
         prefs_set_overwrites(db).await;
     }
@@ -202,14 +168,9 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn test_prefs_get_for_token() {
-        let db = init_surreal_db().await;
-        prefs_get_for_token(db).await;
-    }
     #[sqlx::test(migrations = "./migrations")]
     #[ignore = "requires DATABASE_URL with CREATEDB permission"]
-    async fn test_prefs_get_for_token_sql(pool: ::sqlx::PgPool) {
+    async fn test_prefs_get_for_token(pool: ::sqlx::PgPool) {
         let db = sql::DB::from_pool(pool);
         prefs_get_for_token(db).await;
     }
@@ -248,14 +209,9 @@ mod tests {
         assert_eq!(res.pref_token, second_token);
     }
 
-    #[tokio::test]
-    async fn test_prefs_update_for_token() {
-        let db = init_surreal_db().await;
-        prefs_update_for_token(db).await;
-    }
     #[sqlx::test(migrations = "./migrations")]
     #[ignore = "requires DATABASE_URL with CREATEDB permission"]
-    async fn test_prefs_update_for_token_sql(pool: ::sqlx::PgPool) {
+    async fn test_prefs_update_for_token(pool: ::sqlx::PgPool) {
         let db = sql::DB::from_pool(pool);
         prefs_update_for_token(db).await;
     }
