@@ -6,17 +6,9 @@ host_url = "http://localhost:4343" # the domain where the service is reachable
 app_url = "http://localhost:8081" # the domain where the ebill app is hosted for this env
 wdc_dashboard_url = "http://localhost:5173" # the domain where the wildcat dashboard is hosted for this env
 
-[appcfg.email_notification_preferences]
-connection = "ws://surrealdb:8000"
-namespace = "test"
-database = "ens"
-table = "email_notification_preferences"
-
-[appcfg.challenges]
-connection = "ws://surrealdb:8000"
-namespace = "test"
-database = "ens"
-table = "challenges"
+[appcfg.repository]
+connection = "postgres://postgres:password@postgres:5432/ens"
+max_connections = 5
 
 [appcfg.mailjet_config]
 sender = "notifications@bit.cr"

@@ -39,7 +39,7 @@ services:
     image: wildcat/ens-service
     pull_policy: never
     depends_on:
-      surrealdb:
+      postgres:
         condition: service_healthy
     volumes:
       - ./docker/ens-service/config.toml:/ens-service/config.toml
@@ -96,6 +96,8 @@ services:
       POSTGRES_PASSWORD: password
     volumes:
       - ./.docker_data/postgres_data:/var/lib/postgresql/data
+      # creates the service databases, only on an empty data folder
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s

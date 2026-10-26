@@ -19,8 +19,6 @@ mod service;
 mod template;
 mod web;
 
-pub type ProdChallengeRepository = bcr_wdc_shared::challenge::persistence::surreal::DBChallenges;
-pub type ProdEmailConfirmationRepository = persistence::surreal::DBEmailNotificationPreferences;
 pub type ProdService = service::Service;
 pub type ProdEmailClient = MailjetClient;
 
@@ -29,8 +27,7 @@ pub struct AppConfig {
     host_url: url::Url,
     app_url: url::Url,
     wdc_dashboard_url: url::Url,
-    challenges: bcr_wdc_shared::challenge::persistence::surreal::ConnectionConfig,
-    email_notification_preferences: persistence::surreal::ConnectionConfig,
+    repository: bcr_wdc_shared::db::sql::DBConnConfig,
     mailjet_config: MailJetConfig,
     #[serde(default)]
     admin_recipients: Vec<email_address::EmailAddress>,
@@ -45,13 +42,15 @@ pub struct AppController {
 impl AppController {
     pub async fn new(cfg: AppConfig) -> Self {
         let cfg_clone = cfg.clone();
-        let email_notification_preferences_repo =
-            ProdEmailConfirmationRepository::new(cfg.email_notification_preferences)
-                .await
-                .expect("email notification preferences repo");
-        let challenge_repo = ProdChallengeRepository::new(cfg.challenges)
+        let pool = bcr_wdc_shared::db::sql::connect(&cfg.repository)
             .await
-            .expect("challenges repo");
+            .expect("postgres connection");
+        bcr_wdc_shared::db::sql::run_migrations(&pool)
+            .await
+            .expect("postgres migrations");
+        let challenge_repo =
+            bcr_wdc_shared::challenge::persistence::sql::DB::from_pool(pool.clone());
+        let email_notification_preferences_repo = persistence::sql::DB::from_pool(pool);
         let email_client = ProdEmailClient::new(&cfg.mailjet_config);
 
         let srvc = Arc::new(ProdService::new(
