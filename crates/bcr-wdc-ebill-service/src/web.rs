@@ -394,6 +394,47 @@ pub async fn recover_from_seed_phrase(
     Ok(Json(SuccessResponse::default()))
 }
 
+/// Public proof only: never expose the administrative profile or seed endpoint.
+/// Validate before loading the identity; one key lookup and one Schnorr signature.
+pub async fn get_mint_identity(
+    State(ctrl): State<AppController>,
+    Query(query): Query<bcr_common::wire::mint_identity::MintIdentityQuery>,
+) -> std::result::Result<impl IntoResponse, StatusCode> {
+    mint_identity_response(query, async {
+        let full = ctrl
+            .identity_service
+            .get_full_identity()
+            .await
+            .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
+        Ok((full.identity.node_id, full.key_pair.get_key_pair()))
+    })
+    .await
+}
+
+async fn mint_identity_response(
+    query: bcr_common::wire::mint_identity::MintIdentityQuery,
+    load_keys: impl std::future::Future<
+        Output = std::result::Result<
+            (bcr_common::core::NodeId, bitcoin::secp256k1::Keypair),
+            StatusCode,
+        >,
+    >,
+) -> std::result::Result<axum::response::Response, StatusCode> {
+    use bcr_common::wire::mint_identity::{MintIdentity, valid_challenge};
+    if !valid_challenge(&query.challenge) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let (node_id, keys) = load_keys.await?;
+    let proof = MintIdentity::sign(
+        node_id,
+        query.challenge,
+        time::OffsetDateTime::now_utc().unix_timestamp(),
+        &keys,
+    )
+    .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+    Ok(([(header::CACHE_CONTROL, "no-store")], Json(proof)).into_response())
+}
+
 #[tracing::instrument(level = tracing::Level::DEBUG, skip(ctrl))]
 pub async fn get_identity(
     State(ctrl): State<AppController>,
@@ -1093,5 +1134,91 @@ mod bill_file_url_tests {
             let ip = value.parse::<IpAddr>().unwrap();
             assert!(is_globally_routable_ip(ip), "{value} must be allowed");
         }
+    }
+}
+
+#[cfg(test)]
+mod mint_identity_tests {
+    use super::*;
+    use axum::{Router, routing::get};
+    use bcr_common::{
+        core::NodeId,
+        wire::mint_identity::{MINT_IDENTITY_PATH, MintIdentity},
+    };
+    use bitcoin::Network;
+    use tower::ServiceExt;
+
+    #[tokio::test]
+    async fn public_mint_identity_signs_with_the_ebill_node_key_and_rejects_bad_queries() {
+        let keys = BcrKeys::new().get_key_pair();
+        let node = NodeId::new(keys.public_key(), Network::Regtest);
+        let expected = node.clone();
+        // Same extractor and response implementation as the production handler;
+        // fixture keys replace only the persistence read.
+        let app = Router::new().route(
+            MINT_IDENTITY_PATH,
+            get(move |Query(query)| {
+                let node = node.clone();
+                async move { mint_identity_response(query, async { Ok((node, keys)) }).await }
+            }),
+        );
+        let challenge = "ab".repeat(32);
+        let request = axum::http::Request::builder()
+            .uri(format!("{MINT_IDENTITY_PATH}?challenge={challenge}"))
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let response = app.clone().oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+        let bytes = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let proof: MintIdentity = serde_json::from_slice(&bytes).unwrap();
+        assert!(proof.verify(
+            &expected,
+            &challenge,
+            time::OffsetDateTime::now_utc().unix_timestamp()
+        ));
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&bytes)
+                .unwrap()
+                .as_object()
+                .unwrap()
+                .len(),
+            6
+        );
+        for query in [
+            String::new(),
+            "?challenge=".to_owned(),
+            format!("?challenge={}", "A".repeat(64)),
+            format!("?challenge={}", "a".repeat(63)),
+            format!("?challenge={}", "a".repeat(65)),
+            format!("?challenge={challenge}&extra=1"),
+            format!("?challenge={challenge}&challenge={challenge}"),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(
+                    axum::http::Request::builder()
+                        .uri(format!("{MINT_IDENTITY_PATH}{query}"))
+                        .body(axum::body::Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST, "{query}");
+        }
+        // Invalid challenges must not even poll the key-loading future.
+        assert_eq!(
+            mint_identity_response(
+                bcr_common::wire::mint_identity::MintIdentityQuery {
+                    challenge: "invalid".to_owned()
+                },
+                async { panic!("invalid query attempted to load secret key") }
+            )
+            .await
+            .unwrap_err(),
+            StatusCode::BAD_REQUEST
+        );
     }
 }

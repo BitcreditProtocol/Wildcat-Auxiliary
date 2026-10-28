@@ -216,6 +216,10 @@ impl AppController {
 
 pub fn routes(ctrl: AppController) -> Router {
     Router::new()
+        .route(
+            EbillClient::GET_MINT_IDENTITY_EP_V1,
+            get(web::get_mint_identity),
+        )
         .route(EbillClient::GET_IDENTITY_EP_V1, get(web::get_identity))
         .route(
             EbillClient::CREATE_IDENTITY_EP_V1,

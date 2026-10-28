@@ -114,6 +114,7 @@ async fn main() {
             relay_ack_threshold: 1,
         },
         mint_config: MintConfig {
+            mints: vec![],
             default_mint_url: maincfg.appcfg.mint_config.default_mint_url.clone(),
             default_mint_node_id: NodeId::from_str(
                 &maincfg.appcfg.mint_config.default_mint_node_id,
