@@ -56,7 +56,7 @@ pub async fn main_loop(
             };
             let InfoReply::Pending {
                 bill, submitted, ..
-            } = quote
+            } = quote.quote
             else {
                 tracing::warn!("Unexpected quote status: id: {:?}", quote);
                 continue;
