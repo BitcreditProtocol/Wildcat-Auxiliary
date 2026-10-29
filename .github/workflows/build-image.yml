@@ -43,7 +43,7 @@ jobs:
 
   base-image:
     if: github.event_name != 'pull_request'
-    timeout-minutes: 15
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     permissions:
       contents: read
