@@ -1,4 +1,5 @@
 # 0.5.0
+- eBills service retries failed Nostr consumer starts and task exits with bounded backoff, and exposes consumer readiness at `/health`.
 - eBills service upgraded to E-Bill 0.6.0 storage moves from SurrealDB to Postgres.
 - New eBills endpoints: bill balance history (counts unpaid bills only) and `check_bill_payment`.
 - Admin notifications (ens-service): privileged admin sources can now send email notifications to a configured list of addresses, with no authentication

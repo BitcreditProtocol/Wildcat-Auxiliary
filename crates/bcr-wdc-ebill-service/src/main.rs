@@ -20,6 +20,7 @@ use tracing_subscriber::{
 };
 // ----- local modules
 mod job;
+mod nostr_consumer;
 // ----- end imports
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -208,7 +209,9 @@ async fn main() {
             .expect("Failed to create identity");
     }
 
-    let router = bcr_wdc_ebill_service::routes(app.clone());
+    let (readiness_tx, readiness_rx) = tokio::sync::watch::channel(false);
+    let router = bcr_wdc_ebill_service::routes(app.clone())
+        .merge(nostr_consumer::health_router(readiness_rx));
 
     // run jobs in background
     let app_clone = app.clone();
@@ -241,39 +244,21 @@ async fn main() {
     let nostr_consumer_restart_interval =
         maincfg.restart_nostr_consumer_interval_secs.unwrap_or(240);
 
-    // run nostr consumer in the background and restart regularly so we don't drop events
+    // Periodic resubscription recovers events missed by the consumer.
     let nostr_handle = tokio::spawn(async move {
-        info!(
-            "Starting Nostr Consumer Loop - restart interval {}s",
-            nostr_consumer_restart_interval
-        );
-        let interval = std::time::Duration::from_secs(nostr_consumer_restart_interval);
-
-        loop {
-            let mut joinset = nostr_consumer.start().await.expect("nostr consumer failed");
-
-            // for each interval, or if a task exits, we re-start the consumer
-            let reason = tokio::select! {
-                _ = tokio::time::sleep(interval) => "interval elapsed",
-                _ = joinset.join_next() => "a task finished",
-            };
-
-            info!("Restarting nostr consumer - reason: {reason}");
-
-            joinset.abort_all();
-
-            // flush tasks, so we don't leak tasks
-            while joinset.join_next().await.is_some() {
-                info!("Nostr consumer task shutdown");
-            }
-
-            // unsubscribe all, so we re-subscribe again on re-connect
-            if let Ok(cl) = nostr_client.client().await
-                && let Err(e) = cl.unsubscribe_all().await
-            {
-                warn!("Failed to unsubscribe before reconnect: {e}");
-            }
-        }
+        nostr_consumer::run(
+            || nostr_consumer.start(),
+            || async {
+                if let Ok(cl) = nostr_client.client().await
+                    && let Err(e) = cl.unsubscribe_all().await
+                {
+                    warn!("Failed to unsubscribe before reconnect: {e}");
+                }
+            },
+            std::time::Duration::from_secs(nostr_consumer_restart_interval),
+            readiness_tx,
+        )
+        .await;
     });
 
     // run web server
@@ -294,6 +279,7 @@ async fn main() {
         .await
         .expect("Failed to start server");
     nostr_handle.abort();
+    let _ = nostr_handle.await;
 }
 
 fn ensure_temp_dir(path: &Path) -> std::io::Result<()> {
