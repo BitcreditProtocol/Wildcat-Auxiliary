@@ -835,7 +835,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-demo-faucet"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "bcr-common",
  "bitcoin",
@@ -852,7 +852,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-ebill-service"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "async-trait",
  "axum",
@@ -884,7 +884,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-eic-service"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -915,7 +915,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-ens-service"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -944,7 +944,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-relay"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -971,7 +971,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-shared"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "async-trait",

@@ -1,10 +1,15 @@
+# 0.5.1
+
+* Add additional rate-limiting configs for bcr-wdc-relay: `queries_per_minute`, `messages_per_minute` and `max_filter_limit`
+* eBills service retries failed Nostr consumer starts and task exits with bounded backoff, and exposes consumer readiness at `/health`.
+
 # 0.5.0
-- eBills service retries failed Nostr consumer starts and task exits with bounded backoff, and exposes consumer readiness at `/health`.
-- eBills service upgraded to E-Bill 0.6.0 storage moves from SurrealDB to Postgres.
-- New eBills endpoints: bill balance history (counts unpaid bills only) and `check_bill_payment`.
-- Admin notifications (ens-service): privileged admin sources can now send email notifications to a configured list of addresses, with no authentication
+
+* eBills service upgraded to E-Bill 0.6.0 storage moves from SurrealDB to Postgres.
+* New eBills endpoints: bill balance history (counts unpaid bills only) and `check_bill_payment`.
+* Admin notifications (ens-service): privileged admin sources can now send email notifications to a configured list of addresses, with no authentication
   needed.
-- SQLx/Postgres persistence: eic-service, ens-service and the shared challenge repository now have SQLx backends. eic-service gets a migration script.
+* SQLx/Postgres persistence: eic-service, ens-service and the shared challenge repository now have SQLx backends. eic-service gets a migration script.
 
 # 0.3.0
 

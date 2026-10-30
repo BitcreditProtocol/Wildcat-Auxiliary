@@ -47,6 +47,9 @@ async fn builder(config: &RelayConfig, pool: Pool) -> Result<LocalRelayBuilder> 
     Ok(LocalRelay::builder()
         .nip42(auth_mode(config))
         .database(dba)
+        .queries_per_minute(config.queries_per_minute)
+        .messages_per_minute(config.messages_per_minute)
+        .max_filter_limit(config.max_filter_limit)
         .write_policy(block_rate_limiter(config)))
 }
 
@@ -102,6 +105,12 @@ pub struct RelayConfig {
     pub max_file_size_bytes: usize,
     #[arg(default_value_t = 30, long, env = "MIRROR_TIMEOUT_SECONDS")]
     pub mirror_timeout_seconds: u64,
+    #[arg(default_value_t = 1_200, long, env = "QUERIES_PER_MINUTE")]
+    pub queries_per_minute: u32,
+    #[arg(default_value_t = 6_000, long, env = "MESSAGES_PER_MINUTE")]
+    pub messages_per_minute: u32,
+    #[arg(default_value_t = 500, long, env = "MAX_FILTER_LIMIT")]
+    pub max_filter_limit: usize,
 }
 
 impl RelayConfig {
