@@ -179,6 +179,7 @@ impl AppController {
             mint_client.clone(),
             court_client.clone(),
             db.nostr_contact_store.clone(),
+            db.transaction_mgr.clone(),
         ));
 
         let identity_service = IdentityService::new(
@@ -191,6 +192,7 @@ impl AppController {
             email_client.clone(),
             db.email_notification_store.clone(),
             db.contact_store.clone(),
+            db.transaction_mgr.clone(),
             cfg.clone(),
         );
 

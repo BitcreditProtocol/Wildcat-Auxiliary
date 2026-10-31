@@ -158,6 +158,7 @@ impl axum::response::IntoResponse for BillServiceError {
                 (StatusCode::NOT_FOUND, "not found".to_string()).into_response()
             }
             bill_service::Error::Persistence(_)
+            | bill_service::Error::Internal(_)
             | bill_service::Error::ExternalApi(_)
             | bill_service::Error::Cryptography(_)
             | bill_service::Error::Notification(_) => {

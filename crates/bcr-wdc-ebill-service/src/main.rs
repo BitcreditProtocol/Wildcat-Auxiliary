@@ -113,14 +113,13 @@ async fn main() {
             max_relays: Some(50),
             relay_ack_threshold: 1,
         },
-        mint_config: MintConfig {
-            mints: vec![],
-            default_mint_url: maincfg.appcfg.mint_config.default_mint_url.clone(),
-            default_mint_node_id: NodeId::from_str(
-                &maincfg.appcfg.mint_config.default_mint_node_id,
-            )
-            .expect("Invalid Mint Node Id"),
-        },
+        // validates the Mint URL as bcr_ebill_api::init did before Config was injected
+        mint_config: MintConfig::new(
+            maincfg.appcfg.mint_config.default_mint_url.to_string(),
+            NodeId::from_str(&maincfg.appcfg.mint_config.default_mint_node_id)
+                .expect("Invalid Mint Node Id"),
+        )
+        .expect("Invalid Mint configuration"),
         db_conf: bcr_ebill_persistence::DbConfig {
             connection_string: maincfg.appcfg.ebill_db.pg_connection.clone(),
             temp_files_path: maincfg.appcfg.ebill_db.temp_files_path.clone(),
@@ -132,6 +131,11 @@ async fn main() {
                 .num_confirmations_for_payment,
         },
     });
+
+    // reject an unsupported network at startup; Config::bitcoin_network() expects a valid one
+    api_config
+        .try_bitcoin_network()
+        .expect("Unsupported bitcoin network");
 
     // initialize DB context
     let db = bcr_ebill_api::get_db_context(api_config.clone(), &keys_from_mnemonic)
