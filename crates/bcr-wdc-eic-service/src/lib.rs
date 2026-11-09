@@ -6,6 +6,7 @@ use axum::{
 };
 use bcr_common::core::NodeId;
 use bcr_wdc_shared::{
+    challenge::persistence::ChallengeRepository,
     email::mailjet::{MailJetConfig, MailjetClient},
     rate_limit::RateLimiter,
 };
@@ -23,8 +24,6 @@ mod web;
 
 pub use service::EmailConfirmationRepository;
 
-pub type ProdChallengeRepository = bcr_wdc_shared::challenge::persistence::surreal::DBChallenges;
-pub type ProdEmailConfirmationRepository = persistence::surreal::DBEmails;
 pub type ProdEmailClient = MailjetClient;
 pub type ProdEnsClient = ens::Client;
 pub type ProdService = service::Service;
@@ -58,12 +57,7 @@ pub struct AppController {
 impl AppController {
     pub async fn new(secret_key: &SecretKey, cfg: AppConfig) -> Self {
         let cfg_clone = cfg.clone();
-        let challenge_repo = ProdChallengeRepository::new(cfg.challenges)
-            .await
-            .expect("challenges repo");
-        let email_confirmation_repo = ProdEmailConfirmationRepository::new(cfg.email_confirmations)
-            .await
-            .expect("challenges repo");
+        let (challenge_repo, email_confirmation_repo) = init_repositories(&cfg).await;
         let email_client = ProdEmailClient::new(&cfg.mailjet_config);
         let ens_client = ProdEnsClient::new(cfg.ens.base_url);
 
@@ -71,8 +65,8 @@ impl AppController {
         let mint_private_key = secret_key.to_owned();
 
         let srvc = Arc::new(ProdService::new(
-            Arc::new(challenge_repo),
-            Arc::new(email_confirmation_repo),
+            challenge_repo,
+            email_confirmation_repo,
             Arc::new(email_client),
             Arc::new(ens_client),
             cfg_clone,
@@ -83,6 +77,54 @@ impl AppController {
         Self {
             srvc,
             rate_limiter: Arc::new(Mutex::new(RateLimiter::new())),
+        }
+    }
+}
+
+async fn init_repositories(
+    cfg: &AppConfig,
+) -> (
+    Arc<dyn ChallengeRepository>,
+    Arc<dyn EmailConfirmationRepository>,
+) {
+    let surreal_emails = persistence::surreal::DBEmails::new(cfg.email_confirmations.clone())
+        .await
+        .expect("email confirmations repo");
+    let migrated = surreal_emails
+        .is_migrated()
+        .await
+        .expect("migration marker");
+    let pg_configured = cfg.repository_new.max_connections > 0;
+    match (migrated, pg_configured) {
+        (false, _) => {
+            if pg_configured {
+                tracing::info!(
+                    "PostgreSQL configured, but not migrated yet - running on SurrealDB"
+                );
+            }
+            let challenge_repo =
+                bcr_wdc_shared::challenge::persistence::surreal::DBChallenges::new(
+                    cfg.challenges.clone(),
+                )
+                .await
+                .expect("challenges repo");
+            (Arc::new(challenge_repo), Arc::new(surreal_emails))
+        }
+        (true, true) => {
+            tracing::info!("SurrealDB is migrated - running on PostgreSQL");
+            let pool = bcr_wdc_shared::db::sql::connect(&cfg.repository_new)
+                .await
+                .expect("postgres connection");
+            bcr_wdc_shared::db::sql::run_migrations(&pool)
+                .await
+                .expect("postgres migrations");
+            let challenge_repo =
+                bcr_wdc_shared::challenge::persistence::sql::DB::from_pool(pool.clone());
+            let email_confirmation_repo = persistence::sql::DB::from_pool(pool);
+            (Arc::new(challenge_repo), Arc::new(email_confirmation_repo))
+        }
+        (true, false) => {
+            panic!("SurrealDB is marked as migrated, but appcfg.repository_new is not configured")
         }
     }
 }
