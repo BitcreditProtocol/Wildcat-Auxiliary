@@ -118,7 +118,8 @@ impl axum::response::IntoResponse for ServiceError {
             bcr_ebill_api::service::Error::ExternalApi(_)
             | service::Error::TransportService(_)
             | bcr_ebill_api::service::Error::CryptoUtil(_)
-            | bcr_ebill_api::service::Error::Persistence(_) => {
+            | bcr_ebill_api::service::Error::Persistence(_)
+            | bcr_ebill_api::service::Error::Internal(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, String::new()).into_response()
             }
             service::Error::Validation(validation_error) => {
@@ -145,6 +146,7 @@ impl axum::response::IntoResponse for BillServiceError {
             bill_service::Error::Persistence(_)
             | bill_service::Error::ExternalApi(_)
             | bill_service::Error::Cryptography(_)
+            | bill_service::Error::Internal(_)
             | bill_service::Error::Notification(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, String::new()).into_response()
             }

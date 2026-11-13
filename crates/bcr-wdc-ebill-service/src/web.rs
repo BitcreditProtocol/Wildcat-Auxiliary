@@ -362,7 +362,6 @@ pub async fn recover_from_seed_phrase(
         ctrl.cfg.clone(),
         &keys,
         ctrl.chain_key_service.clone(),
-        ctrl.contact_service.clone(),
         ctrl.push_service.clone(),
         ctrl.mint_client.clone(),
     )

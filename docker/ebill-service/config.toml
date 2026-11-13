@@ -11,9 +11,8 @@ pg_connection = "postgres://postgres:password@localhost:5432/postgres"
 temp_files_path = "temp_files"
 
 [appcfg.nostr_cfg]
-relays = ["wss://relay.wildcat0.clowder-dev.minibill.tech"]
-blossom_servers = ["https://relay.wildcat0.clowder-dev.minibill.tech"]
-only_known_contacts = false
+relays = ["wss://relay.wildcat0.clowder-dev.minibill.tech", "wss://relay.wildcat1.clowder-dev.minibill.tech"]
+blossom_servers = ["https://relay.wildcat0.clowder-dev.minibill.tech", "https://relay.wildcat1.clowder-dev.minibill.tech"]
 
 [appcfg.mint_config]
 default_mint_url = "http://localhost:4343"
