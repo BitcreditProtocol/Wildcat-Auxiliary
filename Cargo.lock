@@ -696,8 +696,8 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 
 [[package]]
 name = "bcr-common"
-version = "0.11.0"
-source = "git+https://github.com/BitcreditProtocol/bcr-common.git?rev=990a134150949d9c6a25374df9cdec57ad7516e2#990a134150949d9c6a25374df9cdec57ad7516e2"
+version = "0.13.0-rc1"
+source = "git+https://github.com/BitcreditProtocol/bcr-common.git?rev=d2a0d28#d2a0d28ced2fc375e0d1f8f94f85c56680712c74"
 dependencies = [
  "bip39 3.0.0",
  "bitcoin",
@@ -725,7 +725,7 @@ dependencies = [
 [[package]]
 name = "bcr-ebill-api"
 version = "0.6.0"
-source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?tag=v0.6.0-rc2#bc0f0dcbb9e07ca505673dbb6846cce5af8bad33"
+source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=ed852ee#ed852ee8a46a700c52d8e8a20a08eda5f0601b67"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -757,7 +757,7 @@ dependencies = [
 [[package]]
 name = "bcr-ebill-core"
 version = "0.6.0"
-source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?tag=v0.6.0-rc2#bc0f0dcbb9e07ca505673dbb6846cce5af8bad33"
+source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=ed852ee#ed852ee8a46a700c52d8e8a20a08eda5f0601b67"
 dependencies = [
  "ammonia",
  "bcr-common",
@@ -785,7 +785,7 @@ dependencies = [
 [[package]]
 name = "bcr-ebill-persistence"
 version = "0.6.0"
-source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?tag=v0.6.0-rc2#bc0f0dcbb9e07ca505673dbb6846cce5af8bad33"
+source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=ed852ee#ed852ee8a46a700c52d8e8a20a08eda5f0601b67"
 dependencies = [
  "arc-swap",
  "async-trait",
@@ -810,7 +810,7 @@ dependencies = [
 [[package]]
 name = "bcr-ebill-transport"
 version = "0.6.0"
-source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?tag=v0.6.0-rc2#bc0f0dcbb9e07ca505673dbb6846cce5af8bad33"
+source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=ed852ee#ed852ee8a46a700c52d8e8a20a08eda5f0601b67"
 dependencies = [
  "async-broadcast",
  "async-trait",

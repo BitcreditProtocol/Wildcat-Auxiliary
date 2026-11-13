@@ -40,6 +40,8 @@ const NOT_AVAILABLE: &str = "n/a";
 pub fn admin_notification_subject(notification: &NotificationRequest) -> &'static str {
     match notification {
         NotificationRequest::NewEbillQuote { .. } => "New e-bill quote request",
+        NotificationRequest::EbillMatured { .. } => todo!(),
+        NotificationRequest::EbillRepaid { .. } => todo!(),
     }
 }
 
@@ -75,6 +77,8 @@ pub fn build_admin_notification_body(
             };
             tt.render("mail", &context)?
         }
+        NotificationRequest::EbillMatured { .. } => todo!(),
+        NotificationRequest::EbillRepaid { .. } => todo!(),
     };
     Ok(body)
 }
