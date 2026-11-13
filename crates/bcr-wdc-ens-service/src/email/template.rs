@@ -175,3 +175,59 @@ impl NewEbillQuoteNotificationEmail {
         TEMPLATE
     }
 }
+
+/// Generic admin notification email listing all provided fields.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct GenericAdminNotificationEmail {
+    pub title: String,
+    pub fields: Vec<MailField>,
+}
+
+impl GenericAdminNotificationEmail {
+    pub fn template() -> &'static str {
+        const TEMPLATE: &str = r#"
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>{title}</title>
+    </head>
+    <body style="margin:0; padding:0; background:#ffffff;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+            <tr>
+                <td align="center">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="650" class="container" style="width:650px; max-width:650px; background:#ffffff;">
+                        <tr style="background: #fefbf1;">
+                            <td class="px" style="padding:15px 24px 8px 24px; font-family:Geist, system-ui, sans-serif; color:#111111;">
+                                <h1 style="margin:0; font-size:24px; line-height:36px; font-weight:500;">
+                                    {title}
+                                </h1>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="px" style="padding:24px 24px 36px 24px;">
+                                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
+                                       style="font-family:Geist, system-ui, sans-serif; font-size:14px; line-height:20px; color:#111111;">
+                                    {{ for field in fields }}
+                                    <tr>
+                                        <td style="padding:6px 12px 6px 0; border-bottom:1px solid #efefef; color:#333333; font-weight:500; white-space:nowrap;">{field.key}</td>
+                                        <td style="padding:6px 0; border-bottom:1px solid #efefef; word-break:break-all;">{field.value}</td>
+                                    </tr>
+                                    {{ endfor }}
+                                </table>
+                            </td>
+                        </tr>
+                    </table>
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="650" class="container" style="width:650px; max-width:650px;">
+                        <tr><td style="height:24px; line-height:24px;">&nbsp;</td></tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+</html>
+"#;
+        TEMPLATE
+    }
+}
