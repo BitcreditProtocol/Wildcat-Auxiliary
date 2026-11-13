@@ -49,6 +49,8 @@ pub struct AppConfig {
     pub dev_mode_config: DevModeConfig,
     pub create_identity_if_none_exists: bool,
     pub identity_config: IdentityConfig,
+    /// base url of the ens-service, admin notifications are disabled if not set
+    pub ens_url: Option<url::Url>,
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize)]
