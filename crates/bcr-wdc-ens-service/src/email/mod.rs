@@ -5,7 +5,9 @@ use tinytemplate::TinyTemplate;
 
 mod template;
 
-use template::{NewEbillQuoteNotificationEmail, NotificationEmail, map_to_fields};
+use template::{
+    GenericAdminNotificationEmail, NewEbillQuoteNotificationEmail, NotificationEmail, map_to_fields,
+};
 
 pub fn build_email_notification_message(
     logo_url: &url::Url,
@@ -40,8 +42,8 @@ const NOT_AVAILABLE: &str = "n/a";
 pub fn admin_notification_subject(notification: &NotificationRequest) -> &'static str {
     match notification {
         NotificationRequest::NewEbillQuote { .. } => "New e-bill quote request",
-        NotificationRequest::EbillMatured { .. } => todo!(),
-        NotificationRequest::EbillRepaid { .. } => todo!(),
+        NotificationRequest::EbillMatured { .. } => "E-bill matured",
+        NotificationRequest::EbillRepaid { .. } => "E-bill repaid",
     }
 }
 
@@ -51,6 +53,7 @@ pub fn build_admin_notification_body(
 ) -> Result<String, anyhow::Error> {
     let mut tt = TinyTemplate::new();
     let na_url = url::Url::parse("https://example.com").unwrap();
+    let subject = admin_notification_subject(&notification);
     let body = match notification {
         NotificationRequest::NewEbillQuote { mut fields } => {
             tt.add_template("mail", NewEbillQuoteNotificationEmail::template())?;
@@ -77,8 +80,15 @@ pub fn build_admin_notification_body(
             };
             tt.render("mail", &context)?
         }
-        NotificationRequest::EbillMatured { .. } => todo!(),
-        NotificationRequest::EbillRepaid { .. } => todo!(),
+        NotificationRequest::EbillMatured { fields }
+        | NotificationRequest::EbillRepaid { fields } => {
+            tt.add_template("mail", GenericAdminNotificationEmail::template())?;
+            let context = GenericAdminNotificationEmail {
+                title: subject.to_owned(),
+                fields: map_to_fields(fields),
+            };
+            tt.render("mail", &context)?
+        }
     };
     Ok(body)
 }
