@@ -1,6 +1,7 @@
 # 0.5.1
 
 * Add additional rate-limiting configs for bcr-wdc-relay: `queries_per_minute`, `messages_per_minute` and `max_filter_limit`
+* eBills service retries failed Nostr consumer starts and task exits with bounded backoff, and exposes consumer readiness at `/health`.
 
 # 0.5.0
 
