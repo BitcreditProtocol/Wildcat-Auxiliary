@@ -1,5 +1,5 @@
 // ----- standard library imports
-use bcr_common::core::NodeId;
+use bcr_common::{client::admin::notification::Client as NotificationClient, core::NodeId};
 use bcr_ebill_api::{CourtConfig, DevModeConfig, MintConfig, NostrConfig, PaymentConfig};
 use bcr_ebill_core::protocol::{
     OptionalPostalAddress, Timestamp, blockchain::identity::IdentityType, crypto::BcrKeys,
@@ -21,6 +21,8 @@ use tracing_subscriber::{
 // ----- local modules
 mod job;
 // ----- end imports
+
+const ENS_CLIENT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 #[derive(Debug, Clone, serde::Deserialize)]
 struct MainConfig {
@@ -209,11 +211,20 @@ async fn main() {
 
     let router = bcr_wdc_ebill_service::routes(app.clone());
 
+    let notification_client = match maincfg.appcfg.ens_url.clone() {
+        Some(ens_url) => Some(NotificationClient::new(ens_url, ENS_CLIENT_TIMEOUT)),
+        None => {
+            warn!("No ens_url configured - admin notifications are disabled");
+            None
+        }
+    };
+
     // run jobs in background
     let app_clone = app.clone();
     tokio::spawn(async move {
         job::run(
             app_clone.clone(),
+            notification_client,
             maincfg.appcfg.job_runner_initial_delay_seconds,
             maincfg.appcfg.job_runner_check_interval_seconds,
         )
