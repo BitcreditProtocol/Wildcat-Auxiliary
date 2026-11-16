@@ -22,6 +22,8 @@ use tracing_subscriber::{
 mod job;
 // ----- end imports
 
+const RELAY_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
 #[derive(Debug, Clone, serde::Deserialize)]
 struct MainConfig {
     bind_address: std::net::SocketAddr,
@@ -184,6 +186,13 @@ async fn main() {
         && !app.identity_service.identity_exists().await
     {
         info!("No identity found - creating from config");
+        nostr_client
+            .client()
+            .await
+            .expect("Failed to connect Nostr client")
+            .connect()
+            .and_wait(RELAY_CONNECT_TIMEOUT)
+            .await;
         app.identity_service
             .create_identity(
                 IdentityType::Ident,
