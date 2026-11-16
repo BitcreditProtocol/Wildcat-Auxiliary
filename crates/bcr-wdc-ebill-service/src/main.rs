@@ -178,6 +178,11 @@ async fn main() {
         bcr_wdc_ebill_service::AppController::new(api_config.clone(), nostr_client.clone(), db)
             .await;
 
+    // before creating the identity, or running jobs, we need to make sure we're connected to a relay
+    app.notification_service.connect().await;
+    // wait a few seconds to make sure we're connected
+    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
     // create identity if it doesn't exist and the flag for initializing a default identity is set
     // this is only useful, if we start an identity from scratch, otherwise we want to just recover a seed
     if maincfg.appcfg.create_identity_if_none_exists
