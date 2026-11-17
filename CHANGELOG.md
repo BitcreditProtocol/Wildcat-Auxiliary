@@ -1,3 +1,8 @@
+# 0.5.2
+
+* Upgrade E-Bill
+* Fix startup with `create_identity_if_none_exists` - it connects and waits for nostr connection before creating the identity
+
 # 0.5.1
 
 * Add additional rate-limiting configs for bcr-wdc-relay: `queries_per_minute`, `messages_per_minute` and `max_filter_limit`

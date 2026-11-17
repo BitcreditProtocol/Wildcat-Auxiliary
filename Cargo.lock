@@ -234,15 +234,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arc-swap"
-version = "1.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "380962b3d93b99642e50b9febf72c071e97e8b32d86eae9cf4ef582bb960ae6e"
-dependencies = [
- "rustversion",
-]
-
-[[package]]
 name = "argon2"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -733,8 +724,8 @@ dependencies = [
 
 [[package]]
 name = "bcr-ebill-api"
-version = "0.6.0"
-source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?tag=v0.6.0#9376e3d9a590dd16ec00b56389793c67b1f760c7"
+version = "0.6.1"
+source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=3d7624762421ce78fbb4f1224eb6fbed6c28d752#3d7624762421ce78fbb4f1224eb6fbed6c28d752"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -765,8 +756,8 @@ dependencies = [
 
 [[package]]
 name = "bcr-ebill-core"
-version = "0.6.0"
-source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?tag=v0.6.0#9376e3d9a590dd16ec00b56389793c67b1f760c7"
+version = "0.6.1"
+source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=3d7624762421ce78fbb4f1224eb6fbed6c28d752#3d7624762421ce78fbb4f1224eb6fbed6c28d752"
 dependencies = [
  "ammonia",
  "bcr-common",
@@ -793,10 +784,9 @@ dependencies = [
 
 [[package]]
 name = "bcr-ebill-persistence"
-version = "0.6.0"
-source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?tag=v0.6.0#9376e3d9a590dd16ec00b56389793c67b1f760c7"
+version = "0.6.1"
+source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=3d7624762421ce78fbb4f1224eb6fbed6c28d752#3d7624762421ce78fbb4f1224eb6fbed6c28d752"
 dependencies = [
- "arc-swap",
  "async-trait",
  "base64 0.23.1",
  "bcr-common",
@@ -818,8 +808,8 @@ dependencies = [
 
 [[package]]
 name = "bcr-ebill-transport"
-version = "0.6.0"
-source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?tag=v0.6.0#9376e3d9a590dd16ec00b56389793c67b1f760c7"
+version = "0.6.1"
+source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=3d7624762421ce78fbb4f1224eb6fbed6c28d752#3d7624762421ce78fbb4f1224eb6fbed6c28d752"
 dependencies = [
  "async-broadcast",
  "async-trait",
@@ -844,7 +834,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-demo-faucet"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "bcr-common",
  "bitcoin",
@@ -861,7 +851,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-ebill-service"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "async-trait",
  "axum",
@@ -892,7 +882,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-eic-service"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -923,7 +913,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-ens-service"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -952,7 +942,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-relay"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -979,7 +969,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-shared"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "anyhow",
  "async-trait",
