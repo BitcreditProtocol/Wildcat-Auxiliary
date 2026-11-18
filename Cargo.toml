@@ -25,7 +25,7 @@ bcr-ebill-transport = {git = "https://github.com/BitcreditProtocol/Bitcredit-Cor
 bcr-ebill-persistence = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "3d7624762421ce78fbb4f1224eb6fbed6c28d752", features = ["postgres"]}
 bcr-wdc-shared = {path = "./crates/bcr-wdc-shared"}
 bip39 = {version = "3"}
-bitcoin = {version = "0.32", features = ["serde"]}
+bitcoin = {version = "0.32"}
 borsh = {version = "1.5"}
 borsh-derive = {version = "1.5"}
 config = {version = "0.15"}

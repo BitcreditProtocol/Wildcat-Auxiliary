@@ -7,7 +7,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use bitcoin::hashes::sha256::Hash as Sha256Hash;
+use bitcoin::{base64::prelude::*, hashes::sha256::Hash as Sha256Hash};
 use nostr::{event::Event, event::Kind};
 use tracing::error;
 
@@ -59,7 +59,7 @@ impl NostrAuthToken {
 
     /// Parse a base64url-encoded Nostr event
     pub fn from_base64(base64_token: &str) -> Result<Self, AuthError> {
-        let event_json = base64_url::decode(base64_token).map_err(|e| {
+        let event_json = BASE64_URL_SAFE_NO_PAD.decode(base64_token).map_err(|e| {
             error!("Failed to decode base64 auth token: {}", e);
             AuthError::MalformedToken
         })?;
@@ -134,6 +134,36 @@ mod tests {
         types::Timestamp,
     };
 
+    #[test]
+    fn test_base64_url_compatibility() {
+        let sequences: [&[u8]; 4] = [
+            // length % 3 == 0: no padding needed
+            b"abc",
+            // length % 3 == 1: would need "==" padding
+            &[0x00],
+            // length % 3 == 2: would need "=" padding
+            b"{}",
+            // bytes mapping to the URL-safe alphabet characters '-' and '_'
+            &[0xfb, 0xff, 0xbf, 0xfe],
+        ];
+
+        for seq in sequences {
+            let reference = base64_url::encode(seq);
+            let encoded = BASE64_URL_SAFE_NO_PAD.encode(seq);
+            assert_eq!(encoded, reference, "encode mismatch for {seq:?}");
+            assert_eq!(
+                BASE64_URL_SAFE_NO_PAD.decode(&reference).unwrap(),
+                seq,
+                "decode of base64_url output failed for {seq:?}"
+            );
+            assert_eq!(
+                base64_url::decode(&encoded).unwrap(),
+                seq,
+                "base64_url decode of our output failed for {seq:?}"
+            );
+        }
+    }
+
     fn create_test_keys() -> Keys {
         Keys::generate()
     }
@@ -146,7 +176,7 @@ mod tests {
             .unwrap();
 
         let event_json = serde_json::to_string(&event).unwrap();
-        let base64_token = base64_url::encode(&event_json);
+        let base64_token = BASE64_URL_SAFE_NO_PAD.encode(&event_json);
         let auth_header = format!("Nostr {}", base64_token);
 
         let result = NostrAuthToken::from_header(&auth_header);
@@ -176,7 +206,7 @@ mod tests {
             .unwrap();
 
         let event_json = serde_json::to_string(&event).unwrap();
-        let base64_token = base64_url::encode(&event_json);
+        let base64_token = BASE64_URL_SAFE_NO_PAD.encode(&event_json);
 
         let result = NostrAuthToken::from_base64(&base64_token);
         assert!(matches!(result, Err(AuthError::ExpiredToken)));
@@ -194,7 +224,7 @@ mod tests {
             .unwrap();
 
         let event_json = serde_json::to_string(&event).unwrap();
-        let base64_token = base64_url::encode(&event_json);
+        let base64_token = BASE64_URL_SAFE_NO_PAD.encode(&event_json);
 
         let token = NostrAuthToken::from_base64(&base64_token).unwrap();
 
@@ -211,7 +241,7 @@ mod tests {
             .unwrap();
 
         let event_json = serde_json::to_string(&event).unwrap();
-        let base64_token = base64_url::encode(&event_json);
+        let base64_token = BASE64_URL_SAFE_NO_PAD.encode(&event_json);
 
         let token = NostrAuthToken::from_base64(&base64_token).unwrap();
 
