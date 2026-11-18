@@ -705,6 +705,34 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 
 [[package]]
 name = "bcr-common"
+version = "0.11.0"
+source = "git+https://github.com/BitcreditProtocol/bcr-common?rev=85c424025fcf010a85edfcd01d693ac61978ec40#85c424025fcf010a85edfcd01d693ac61978ec40"
+dependencies = [
+ "bip39 2.2.2",
+ "bitcoin",
+ "borsh",
+ "cashu",
+ "cdk-common",
+ "ciborium",
+ "infer",
+ "nostr 0.45.7",
+ "rand 0.8.8",
+ "reqwest 0.13.5",
+ "secp256k1 0.29.1",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "strum 0.28.0",
+ "thiserror 2.0.21",
+ "time",
+ "tracing",
+ "url",
+ "utoipa",
+ "uuid",
+]
+
+[[package]]
+name = "bcr-common"
 version = "0.13.0-rc1"
 source = "git+https://github.com/BitcreditProtocol/bcr-common.git?rev=d2a0d28#d2a0d28ced2fc375e0d1f8f94f85c56680712c74"
 dependencies = [
@@ -739,8 +767,8 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.23.1",
- "bcr-common",
- "bcr-ebill-core",
+ "bcr-common 0.13.0-rc1",
+ "bcr-ebill-core 0.6.0",
  "bcr-ebill-persistence",
  "bitcoin",
  "borsh",
@@ -765,11 +793,39 @@ dependencies = [
 
 [[package]]
 name = "bcr-ebill-core"
+version = "0.5.16"
+source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?tag=v0.5.16#a58a40a280915359051c6ab872c04abc8401c88c"
+dependencies = [
+ "ammonia",
+ "bcr-common 0.11.0",
+ "bip39 2.2.2",
+ "bitcoin",
+ "borsh",
+ "borsh-derive",
+ "ecies",
+ "email_address",
+ "log",
+ "miniscript",
+ "nostr 0.45.7",
+ "once_cell",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "strum 0.28.0",
+ "thiserror 2.0.21",
+ "time",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "bcr-ebill-core"
 version = "0.6.0"
 source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?tag=v0.6.0#9376e3d9a590dd16ec00b56389793c67b1f760c7"
 dependencies = [
  "ammonia",
- "bcr-common",
+ "bcr-common 0.13.0-rc1",
  "bip39 3.0.0",
  "bitcoin",
  "borsh",
@@ -799,8 +855,8 @@ dependencies = [
  "arc-swap",
  "async-trait",
  "base64 0.23.1",
- "bcr-common",
- "bcr-ebill-core",
+ "bcr-common 0.13.0-rc1",
+ "bcr-ebill-core 0.6.0",
  "bitcoin",
  "borsh",
  "futures",
@@ -823,9 +879,9 @@ source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?tag=v0.6.0
 dependencies = [
  "async-broadcast",
  "async-trait",
- "bcr-common",
+ "bcr-common 0.13.0-rc1",
  "bcr-ebill-api",
- "bcr-ebill-core",
+ "bcr-ebill-core 0.6.0",
  "bcr-ebill-persistence",
  "bitcoin",
  "borsh",
@@ -846,7 +902,7 @@ dependencies = [
 name = "bcr-wdc-demo-faucet"
 version = "0.5.1"
 dependencies = [
- "bcr-common",
+ "bcr-common 0.13.0-rc1",
  "bitcoin",
  "config",
  "serde",
@@ -865,9 +921,9 @@ version = "0.5.1"
 dependencies = [
  "async-trait",
  "axum",
- "bcr-common",
+ "bcr-common 0.13.0-rc1",
  "bcr-ebill-api",
- "bcr-ebill-core",
+ "bcr-ebill-core 0.5.16",
  "bcr-ebill-persistence",
  "bcr-ebill-transport",
  "bip39 3.0.0",
@@ -897,7 +953,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "axum",
- "bcr-common",
+ "bcr-common 0.13.0-rc1",
  "bcr-wdc-shared",
  "bip39 3.0.0",
  "bitcoin",
@@ -929,7 +985,7 @@ dependencies = [
  "async-trait",
  "axum",
  "axum-extra",
- "bcr-common",
+ "bcr-common 0.13.0-rc1",
  "bcr-wdc-shared",
  "bitcoin",
  "bitflags 2.13.2",
@@ -983,7 +1039,7 @@ version = "0.5.1"
 dependencies = [
  "anyhow",
  "async-trait",
- "bcr-common",
+ "bcr-common 0.13.0-rc1",
  "bitcoin",
  "borsh",
  "borsh-derive",
@@ -1041,6 +1097,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90dbd31c98227229239363921e60fcf5e558e43ec69094d46fc4996f08d1d5bc"
 dependencies = [
  "bitcoin_hashes 0.14.101",
+ "rand 0.8.8",
+ "rand_core 0.6.4",
  "serde",
  "unicode-normalization",
 ]
@@ -3236,7 +3294,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core",
 ]
 
 [[package]]
@@ -6652,7 +6710,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",
@@ -7729,7 +7787,7 @@ version = "0.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12342cb4d8e3b046f3d80effd474a7a02447231330ef77d71daa6fbc40681143"
 dependencies = [
- "windows-core 0.57.0",
+ "windows-core",
  "windows-targets",
 ]
 
@@ -7739,23 +7797,10 @@ version = "0.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2ed2439a290666cd67ecce2b0ffaad89c2a56b976b736e6ece670297897832d"
 dependencies = [
- "windows-implement 0.57.0",
- "windows-interface 0.57.0",
+ "windows-implement",
+ "windows-interface",
  "windows-result 0.1.2",
  "windows-targets",
-]
-
-[[package]]
-name = "windows-core"
-version = "0.62.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8e83a14d34d0623b51dce9581199302a221863196a1dde71a7663a4c2be9deb"
-dependencies = [
- "windows-implement 0.60.2",
- "windows-interface 0.59.3",
- "windows-link",
- "windows-result 0.4.1",
- "windows-strings",
 ]
 
 [[package]]
@@ -7770,32 +7815,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-implement"
-version = "0.60.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "053e2e040ab57b9dc951b72c264860db7eb3b0200ba345b4e4c3b14f67855ddf"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
 name = "windows-interface"
 version = "0.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29bee4b38ea3cde66011baa44dba677c432a78593e202392d1e9070cf2a7fca7"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "windows-interface"
-version = "0.59.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f316c4a2570ba26bbec722032c4099d8c8bc095efccdc15688708623367e358"
 dependencies = [
  "proc-macro2",
  "quote",
