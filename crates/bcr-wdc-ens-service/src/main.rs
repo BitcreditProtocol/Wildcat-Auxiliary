@@ -16,7 +16,12 @@ async fn main() {
     let cfg_path = env::var("ENS_CONFIG_FILE").unwrap_or_else(|_| "config.toml".to_string());
     let settings = config::Config::builder()
         .add_source(config::File::with_name(&cfg_path))
-        .add_source(config::Environment::with_prefix("ENS").separator("__"))
+        .add_source(
+            config::Environment::with_prefix("ENS")
+                .separator("__")
+                .list_separator(",")
+                .with_list_parse_key("appcfg.admin_recipients"),
+        )
         .build()
         .expect("Failed to build ens config");
 
