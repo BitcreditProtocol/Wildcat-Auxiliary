@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.5.2"
+version = "0.7.0"
 edition = "2024"
 license = "MIT"
 
@@ -18,11 +18,11 @@ members = [
 anyhow = {version = "1"}
 async-trait = {version = "0.1"}
 axum = {version = "0.8"}
-bcr-common = {git = "https://github.com/BitcreditProtocol/bcr-common.git", rev = "d2a0d28"}
-bcr-ebill-api = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "3d7624762421ce78fbb4f1224eb6fbed6c28d752", features = ["postgres"]}
-bcr-ebill-core = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "3d7624762421ce78fbb4f1224eb6fbed6c28d752"}
-bcr-ebill-transport = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "3d7624762421ce78fbb4f1224eb6fbed6c28d752"}
-bcr-ebill-persistence = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "3d7624762421ce78fbb4f1224eb6fbed6c28d752", features = ["postgres"]}
+bcr-common = {git = "https://github.com/BitcreditProtocol/bcr-common.git", tag = "v0.13.0"}
+bcr-ebill-api = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "70297eb", features = ["postgres"]}
+bcr-ebill-core = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "70297eb"}
+bcr-ebill-transport = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "70297eb"}
+bcr-ebill-persistence = {git = "https://github.com/BitcreditProtocol/Bitcredit-Core.git", rev = "70297eb", features = ["postgres"]}
 bcr-wdc-shared = {path = "./crates/bcr-wdc-shared"}
 bip39 = {version = "3"}
 bitcoin = {version = "0.32"}

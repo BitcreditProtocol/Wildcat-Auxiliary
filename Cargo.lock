@@ -697,7 +697,7 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 [[package]]
 name = "bcr-common"
 version = "0.13.0-rc1"
-source = "git+https://github.com/BitcreditProtocol/bcr-common.git?rev=d2a0d28#d2a0d28ced2fc375e0d1f8f94f85c56680712c74"
+source = "git+https://github.com/BitcreditProtocol/bcr-common.git?tag=v0.13.0#f7299f3765c33cc9eac9e452b8179a1cb2d699f3"
 dependencies = [
  "bip39 3.0.0",
  "bitcoin",
@@ -725,7 +725,7 @@ dependencies = [
 [[package]]
 name = "bcr-ebill-api"
 version = "0.6.1"
-source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=3d7624762421ce78fbb4f1224eb6fbed6c28d752#3d7624762421ce78fbb4f1224eb6fbed6c28d752"
+source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=70297eb#70297eb99d36f99b9805fff3c47bb070bce1a90a"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -757,7 +757,7 @@ dependencies = [
 [[package]]
 name = "bcr-ebill-core"
 version = "0.6.1"
-source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=3d7624762421ce78fbb4f1224eb6fbed6c28d752#3d7624762421ce78fbb4f1224eb6fbed6c28d752"
+source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=70297eb#70297eb99d36f99b9805fff3c47bb070bce1a90a"
 dependencies = [
  "ammonia",
  "bcr-common",
@@ -785,7 +785,7 @@ dependencies = [
 [[package]]
 name = "bcr-ebill-persistence"
 version = "0.6.1"
-source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=3d7624762421ce78fbb4f1224eb6fbed6c28d752#3d7624762421ce78fbb4f1224eb6fbed6c28d752"
+source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=70297eb#70297eb99d36f99b9805fff3c47bb070bce1a90a"
 dependencies = [
  "async-trait",
  "base64 0.23.1",
@@ -809,7 +809,7 @@ dependencies = [
 [[package]]
 name = "bcr-ebill-transport"
 version = "0.6.1"
-source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=3d7624762421ce78fbb4f1224eb6fbed6c28d752#3d7624762421ce78fbb4f1224eb6fbed6c28d752"
+source = "git+https://github.com/BitcreditProtocol/Bitcredit-Core.git?rev=70297eb#70297eb99d36f99b9805fff3c47bb070bce1a90a"
 dependencies = [
  "async-broadcast",
  "async-trait",
@@ -834,7 +834,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-demo-faucet"
-version = "0.5.2"
+version = "0.7.0"
 dependencies = [
  "bcr-common",
  "bitcoin",
@@ -851,7 +851,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-ebill-service"
-version = "0.5.2"
+version = "0.7.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -882,7 +882,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-eic-service"
-version = "0.5.2"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -913,7 +913,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-ens-service"
-version = "0.5.2"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -942,7 +942,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-relay"
-version = "0.5.2"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -969,7 +969,7 @@ dependencies = [
 
 [[package]]
 name = "bcr-wdc-shared"
-version = "0.5.2"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-trait",
