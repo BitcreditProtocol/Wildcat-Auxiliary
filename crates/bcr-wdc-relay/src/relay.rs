@@ -50,6 +50,10 @@ async fn builder(config: &RelayConfig, pool: Pool) -> Result<LocalRelayBuilder> 
         .queries_per_minute(config.queries_per_minute)
         .messages_per_minute(config.messages_per_minute)
         .max_filter_limit(config.max_filter_limit)
+        .rate_limit(nostr_sdk::local_relay::RateLimit {
+            max_reqs: config.nostr_rate_limit_max_reqs,
+            notes_per_minute: config.nostr_rate_limit_notes_per_minute,
+        })
         .write_policy(block_rate_limiter(config)))
 }
 
@@ -111,6 +115,10 @@ pub struct RelayConfig {
     pub messages_per_minute: u32,
     #[arg(default_value_t = 500, long, env = "MAX_FILTER_LIMIT")]
     pub max_filter_limit: usize,
+    #[arg(default_value_t = 500, long, env = "NOSTR_RATE_LIMIT_MAX_REQS")]
+    pub nostr_rate_limit_max_reqs: usize,
+    #[arg(default_value_t = 60, long, env = "NOSTR_RATE_LIMIT_NOTES_PER_MINUTE")]
+    pub nostr_rate_limit_notes_per_minute: u32,
 }
 
 impl RelayConfig {
