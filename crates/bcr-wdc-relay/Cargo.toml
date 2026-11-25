@@ -9,7 +9,7 @@ anyhow.workspace = true
 async-trait.workspace = true
 axum = { workspace = true, features = ["ws", "tokio"] }
 axum-raw-websocket = "0.8"
-bitcoin = { workspace = true, features = ["base64"] }
+bitcoin = { workspace = true, features = ["base64", "serde"] }
 clap = { version = "4.5.39", features = ["derive", "env"] }
 deadpool-postgres = "0.14"
 futures.workspace = true
