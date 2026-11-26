@@ -42,20 +42,29 @@ impl ServiceAccount {
     }
 }
 
-/// Credentials and access tokens are sent to these URLs, so they must use https; plain http is
-/// accepted only for a loopback host.
+/// Credentials and access tokens are sent to these URLs, so they must use https; plain http to a
+/// loopback host is accepted only in tests.
 fn require_secure_url(raw: &str) -> Result<reqwest::Url, anyhow::Error> {
     let url = reqwest::Url::parse(raw).context("invalid url")?;
-    let host = url.host_str().unwrap_or("").trim_matches(['[', ']']);
-    let loopback = host == "localhost"
-        || host
-            .parse::<std::net::IpAddr>()
-            .is_ok_and(|ip| ip.is_loopback());
     match url.scheme() {
         "https" => Ok(url),
-        "http" if loopback => Ok(url),
+        "http" if cfg!(test) && is_loopback(&url) => Ok(url),
         scheme => anyhow::bail!("{scheme} url {url} would send credentials unencrypted"),
     }
+}
+
+#[cfg(test)]
+fn is_loopback(url: &reqwest::Url) -> bool {
+    let host = url.host_str().unwrap_or("").trim_matches(['[', ']']);
+    host == "localhost"
+        || host
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
+}
+
+#[cfg(not(test))]
+fn is_loopback(_: &reqwest::Url) -> bool {
+    false
 }
 
 /// Why one FCM request failed
