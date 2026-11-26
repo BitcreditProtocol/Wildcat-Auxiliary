@@ -75,115 +75,68 @@ impl NotificationEmail {
     }
 }
 
-/// A generic key/value entry rendered in a notification email.
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct MailField {
-    pub key: String,
+    pub label: String,
     pub value: String,
+    pub mono: bool,
 }
 
-impl From<(String, String)> for MailField {
-    fn from((key, value): (String, String)) -> Self {
-        MailField { key, value }
+const KNOWN_FIELDS: &[(&str, &str, bool)] = &[
+    ("drawee", "Drawee", false),
+    ("drawer", "Drawer", false),
+    ("payee", "Payee", false),
+    ("amount", "Amount", false),
+    ("maturity_date", "Maturity date", false),
+    ("bill_id", "Bill ID", true),
+    ("quote_id", "Quote ID", true),
+];
+
+fn humanize_key(key: &str) -> String {
+    let spaced = key.replace('_', " ");
+    let mut chars = spaced.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => spaced,
     }
 }
 
-pub fn map_to_fields(map: HashMap<String, String>) -> Vec<MailField> {
-    let fields: Vec<MailField> = map.into_iter().map(MailField::from).collect();
+pub fn map_to_fields(mut map: HashMap<String, String>) -> Vec<MailField> {
+    let mut fields = Vec::with_capacity(map.len());
+    for (key, label, mono) in KNOWN_FIELDS {
+        if let Some(value) = map.remove(*key) {
+            fields.push(MailField {
+                label: (*label).to_owned(),
+                value,
+                mono: *mono,
+            });
+        }
+    }
+    let mut rest: Vec<(String, String)> = map.into_iter().collect();
+    rest.sort_by(|a, b| a.0.cmp(&b.0));
+    fields.extend(rest.into_iter().map(|(key, value)| MailField {
+        label: humanize_key(&key),
+        value,
+        mono: false,
+    }));
     fields
 }
 
-/// Admin notification email for a new eBill quote request.
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct NewEbillQuoteNotificationEmail {
-    pub drawee: String,
-    pub amount: String,
-    pub maturity_date: String,
-    pub quote_link: url::Url,
-    pub fields: Vec<MailField>,
+pub struct MailAction {
+    pub label: String,
+    pub link: url::Url,
 }
 
-impl NewEbillQuoteNotificationEmail {
-    pub fn template() -> &'static str {
-        const TEMPLATE: &str = r#"
-<!doctype html>
-<html lang="en">
-    <head>
-        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>New e-bill quote request</title>
-    </head>
-    <body style="margin:0; padding:0; background:#ffffff;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
-            <tr>
-                <td align="center">
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="650" class="container" style="width:650px; max-width:650px; background:#ffffff;">
-                        <tr style="background: #fefbf1;">
-                            <td class="px" style="padding:15px 24px 8px 24px; font-family:Geist, system-ui, sans-serif; color:#111111;">
-                                <h1 style="margin:0; font-size:24px; line-height:36px; font-weight:500;">
-                                    New e-bill quote request
-                                </h1>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="px" style="padding:24px 24px 36px 24px;">
-                                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
-                                       style="font-family:Geist, system-ui, sans-serif; font-size:14px; line-height:20px; color:#111111;">
-                                    <tr>
-                                        <td style="padding:6px 12px 6px 0; border-bottom:1px solid #efefef; color:#333333; font-weight:700; white-space:nowrap;">Drawee</td>
-                                        <td style="padding:6px 0; border-bottom:1px solid #efefef; font-weight:700; word-break:break-all;">{drawee}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding:6px 12px 6px 0; border-bottom:1px solid #efefef; color:#333333; font-weight:700; white-space:nowrap;">Amount</td>
-                                        <td style="padding:6px 0; border-bottom:1px solid #efefef; font-weight:700; word-break:break-all;">{amount}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding:6px 12px 6px 0; border-bottom:1px solid #efefef; color:#333333; font-weight:700; white-space:nowrap;">Maturity date</td>
-                                        <td style="padding:6px 0; border-bottom:1px solid #efefef; font-weight:700; word-break:break-all;">{maturity_date}</td>
-                                    </tr>
-                                    {{ for field in fields }}
-                                    <tr>
-                                        <td style="padding:6px 12px 6px 0; border-bottom:1px solid #efefef; color:#333333; font-weight:500; white-space:nowrap;">{field.key}</td>
-                                        <td style="padding:6px 0; border-bottom:1px solid #efefef; word-break:break-all;">{field.value}</td>
-                                    </tr>
-                                    {{ endfor }}
-                                </table>
-                            </td>
-                        </tr>
-                        {{ if quote_link }}
-                        <tr>
-                            <td align="center" style="padding:0px 24px 36px 24px;">
-                                <a href="{quote_link}"
-                                   style="background:#2b2118; color:#ffffff; text-decoration:none; display:inline-block;
-                                          font-family:Geist, system-ui, sans-serif; font-size:14px; font-weight: 500;
-                                          padding:12px 24px; border-radius:.5rem;">
-                                    Go to quote
-                                </a>
-                            </td>
-                        </tr>
-                        {{ endif }}
-                    </table>
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="650" class="container" style="width:650px; max-width:650px;">
-                        <tr><td style="height:24px; line-height:24px;">&nbsp;</td></tr>
-                    </table>
-                </td>
-            </tr>
-        </table>
-    </body>
-</html>
-"#;
-        TEMPLATE
-    }
-}
-
-/// Generic admin notification email listing all provided fields.
 #[derive(Debug, Clone, serde::Serialize)]
-pub struct GenericAdminNotificationEmail {
+pub struct AdminNotificationEmail {
+    pub logo_link: url::Url,
     pub title: String,
     pub fields: Vec<MailField>,
+    pub action: Option<MailAction>,
 }
 
-impl GenericAdminNotificationEmail {
+impl AdminNotificationEmail {
     pub fn template() -> &'static str {
         const TEMPLATE: &str = r#"
 <!doctype html>
@@ -197,30 +150,63 @@ impl GenericAdminNotificationEmail {
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
             <tr>
                 <td align="center">
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="650" class="container" style="width:650px; max-width:650px; background:#ffffff;">
-                        <tr style="background: #fefbf1;">
-                            <td class="px" style="padding:15px 24px 8px 24px; font-family:Geist, system-ui, sans-serif; color:#111111;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="650" class="container" style="width:650px; max-width:650px; background:#fefbf1;">
+                        <tr>
+                            <td class="px" style="padding:18px 24px;">
+                                <img src="{logo_link}"
+                                     alt="Bitcredit" width="120" height="24"
+                                     style="display:block; border:0; outline:none; text-decoration:none; height:auto;">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="px" style="padding:15px 24px 20px 24px; font-family:Geist, system-ui, sans-serif; color:#111111;">
+                                <p style="margin:0 0 4px 0; font-size:12px; line-height:16px; font-weight:500; letter-spacing:.06em; text-transform:uppercase; color:#8d8579;">
+                                    Wildcat admin
+                                </p>
                                 <h1 style="margin:0; font-size:24px; line-height:36px; font-weight:500;">
                                     {title}
                                 </h1>
                             </td>
                         </tr>
+                    </table>
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="650" class="container" style="width:650px; max-width:650px; background:#ffffff;">
                         <tr>
-                            <td class="px" style="padding:24px 24px 36px 24px;">
+                            <td class="px" style="padding:28px 24px 8px 24px;">
                                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"
-                                       style="font-family:Geist, system-ui, sans-serif; font-size:14px; line-height:20px; color:#111111;">
+                                       style="font-family:Geist, system-ui, sans-serif; font-size:14px; line-height:20px; color:#111111; border:1px solid #efefef; border-radius:12px; border-collapse:separate;">
                                     {{ for field in fields }}
                                     <tr>
-                                        <td style="padding:6px 12px 6px 0; border-bottom:1px solid #efefef; color:#333333; font-weight:500; white-space:nowrap;">{field.key}</td>
-                                        <td style="padding:6px 0; border-bottom:1px solid #efefef; word-break:break-all;">{field.value}</td>
+                                        <td style="padding:12px 16px; {{ if not @first }}border-top:1px solid #efefef; {{ endif }}color:#8d8579; white-space:nowrap; vertical-align:top; width:140px;">{field.label}</td>
+                                        <td style="padding:12px 16px; {{ if not @first }}border-top:1px solid #efefef; {{ endif }}font-weight:500; word-break:break-all;{{ if field.mono }} font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:13px;{{ endif }}">{field.value}</td>
                                     </tr>
                                     {{ endfor }}
                                 </table>
                             </td>
                         </tr>
-                    </table>
-                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="650" class="container" style="width:650px; max-width:650px;">
-                        <tr><td style="height:24px; line-height:24px;">&nbsp;</td></tr>
+                        {{ if action }}
+                        <tr>
+                            <td align="center" style="padding:32px 24px 12px 24px;">
+                                <a href="{action.link}"
+                                   style="background:#2b2118; color:#ffffff; text-decoration:none; display:inline-block;
+                                          font-family:Geist, system-ui, sans-serif; font-size:14px; font-weight: 500;
+                                          padding:12px 24px; border-radius:.5rem;">
+                                    {action.label}
+                                </a>
+                            </td>
+                        </tr>
+                        {{ endif }}
+                        <tr><td style="height:32px; line-height:32px;">&nbsp;</td></tr>
+                        <tr>
+                            <td class="px" style="padding:0 24px;">
+                                <div style="border-top:1px solid #efefef; height:1px; line-height:1px;">&nbsp;</div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td align="center" class="px" style="padding:16px 24px 28px 24px; font-family:Geist, system-ui, sans-serif; font-size:13px; line-height:20px; color:#8d8579;">
+                                You receive this email as a configured Wildcat admin recipient.
+                                {{ if action }}<br><a href="{action.link}" style="color:#333333; text-decoration:underline;">Open in the dashboard</a>{{ endif }}
+                            </td>
+                        </tr>
                     </table>
                 </td>
             </tr>
