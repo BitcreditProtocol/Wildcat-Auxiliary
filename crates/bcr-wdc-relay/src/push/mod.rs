@@ -70,7 +70,9 @@ pub struct Device {
 
 /// The absolute URL NIP-98 auth events for device registration must name in their `u` tag
 pub fn push_url(host_url: &Url) -> Option<Url> {
-    host_url.join("push").ok()
+    let mut url = host_url.clone();
+    url.path_segments_mut().ok()?.pop_if_empty().push("push");
+    Some(url)
 }
 
 /// `PUT /push` registers or replaces the signer's token for a platform; `DELETE /push` removes
@@ -235,6 +237,17 @@ mod tests {
         )
         .await
         .status()
+    }
+
+    #[test]
+    fn push_device_url_keeps_host_path() {
+        let host = Url::parse("https://relay.example.com/a").unwrap();
+        let slashed = Url::parse("https://relay.example.com/a/").unwrap();
+        assert_eq!(
+            push_url(&host).unwrap().as_str(),
+            "https://relay.example.com/a/push"
+        );
+        assert_eq!(push_url(&slashed), push_url(&host));
     }
 
     #[test]
