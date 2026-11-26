@@ -116,13 +116,103 @@ impl NostrAuthToken {
 
 /// Extractor for NostrAuthToken from Authorization header
 pub fn extract_auth_token(headers: &axum::http::HeaderMap) -> Result<NostrAuthToken, AuthError> {
-    let auth_header = headers
-        .get("authorization")
-        .or_else(|| headers.get("Authorization"))
-        .and_then(|v| v.to_str().ok())
-        .ok_or(AuthError::BadAuthHeader)?;
+    NostrAuthToken::from_header(authorization_header(headers)?)
+}
 
-    NostrAuthToken::from_header(auth_header)
+fn authorization_header(headers: &axum::http::HeaderMap) -> Result<&str, AuthError> {
+    headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .ok_or(AuthError::BadAuthHeader)
+}
+
+/// Largest accepted base64 `Authorization` token of a NIP-98 request
+const MAX_HTTP_AUTH_TOKEN_LEN: usize = 16 * 1024;
+/// Largest accepted distance in seconds between a NIP-98 event's `created_at` and now
+pub const HTTP_AUTH_WINDOW_SECS: u64 = 60;
+
+/// Why a NIP-98 HTTP auth event does not authorize a request
+#[derive(Debug, PartialEq, Eq)]
+pub enum HttpAuthError {
+    BadAuthHeader,
+    MalformedToken,
+    WrongKind,
+    UrlMismatch,
+    MethodMismatch,
+    OutsideTimeWindow,
+    PayloadMismatch,
+    InvalidSignature,
+}
+
+impl IntoResponse for HttpAuthError {
+    fn into_response(self) -> Response {
+        let status = match self {
+            HttpAuthError::BadAuthHeader | HttpAuthError::MalformedToken => StatusCode::BAD_REQUEST,
+            _ => StatusCode::UNAUTHORIZED,
+        };
+        (status, format!("{self:?}")).into_response()
+    }
+}
+
+/// Verifies a NIP-98 `Authorization: Nostr <base64 event>` header for one HTTP request and
+/// returns the key that signed it.
+///
+/// The event must be of kind 27235, its `u` tag must equal `url`, its `method` tag must equal
+/// `method`, its `created_at` must lie within [`HTTP_AUTH_WINDOW_SECS`] of `now` in either
+/// direction, its `payload` tag must be the hex SHA-256 of `body` whenever `body` is not empty,
+/// and its id and signature must verify. The token is accepted in standard or URL-safe base64.
+pub fn verify_http_auth(
+    headers: &axum::http::HeaderMap,
+    url: &nostr::types::Url,
+    method: &axum::http::Method,
+    body: &[u8],
+    now: nostr::types::Timestamp,
+) -> Result<nostr::key::PublicKey, HttpAuthError> {
+    let header = authorization_header(headers).map_err(|_| HttpAuthError::BadAuthHeader)?;
+    let token = match header.split_once(' ') {
+        Some(("Nostr", token)) if !token.is_empty() => token.trim(),
+        _ => return Err(HttpAuthError::BadAuthHeader),
+    };
+    if token.len() > MAX_HTTP_AUTH_TOKEN_LEN {
+        return Err(HttpAuthError::MalformedToken);
+    }
+    let event_json = BASE64_STANDARD
+        .decode(token)
+        .or_else(|_| BASE64_URL_SAFE_NO_PAD.decode(token))
+        .map_err(|_| HttpAuthError::MalformedToken)?;
+    let event: Event =
+        serde_json::from_slice(&event_json).map_err(|_| HttpAuthError::MalformedToken)?;
+
+    if event.kind != Kind::HttpAuth {
+        return Err(HttpAuthError::WrongKind);
+    }
+    let tag_value = |name: &str| {
+        event
+            .tags
+            .iter()
+            .find(|tag| tag.kind() == name)
+            .and_then(|tag| tag.content())
+    };
+    let signed_url = tag_value("u").and_then(|u| nostr::types::Url::parse(u).ok());
+    if signed_url.as_ref() != Some(url) {
+        return Err(HttpAuthError::UrlMismatch);
+    }
+    if tag_value("method") != Some(method.as_str()) {
+        return Err(HttpAuthError::MethodMismatch);
+    }
+    if event.created_at.as_secs().abs_diff(now.as_secs()) > HTTP_AUTH_WINDOW_SECS {
+        return Err(HttpAuthError::OutsideTimeWindow);
+    }
+    if !body.is_empty() {
+        let body_hash = <Sha256Hash as bitcoin::hashes::Hash>::hash(body).to_string();
+        if tag_value("payload") != Some(body_hash.as_str()) {
+            return Err(HttpAuthError::PayloadMismatch);
+        }
+    }
+    event
+        .verify()
+        .map_err(|_| HttpAuthError::InvalidSignature)?;
+    Ok(event.pubkey)
 }
 
 #[cfg(test)]

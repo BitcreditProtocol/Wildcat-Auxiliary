@@ -1,6 +1,7 @@
 mod auth;
 mod blossom;
 mod db;
+mod push;
 mod rate_limit;
 mod relay;
 
@@ -23,6 +24,7 @@ use deadpool_postgres::Pool;
 use deadpool_postgres::RecyclingMethod;
 use nostr::types::Url;
 use nostr_sdk::local_relay::LocalRelay;
+use push::device_store::DeviceStoreApi;
 use relay::RelayConfig;
 use serde::Serialize;
 use std::{net::SocketAddr, sync::Arc};
@@ -64,6 +66,12 @@ async fn main() -> Result<()> {
         .route("/{hash}", get(blossom::handle_get_file))
         .route("/{hash}", head(blossom::handle_get_file_head))
         .route("/", delete(blossom::handle_delete))
+        .route(
+            "/push",
+            put(push::handle_device)
+                .delete(push::handle_device)
+                .layer(DefaultBodyLimit::max(push::MAX_BODY_BYTES)),
+        )
         .route("/relay_features", get(features_handler))
         .route("/health", get(health))
         .route("/", any(websocket_handler))
@@ -111,10 +119,16 @@ struct RelayFeature {
 async fn features_handler() -> impl IntoResponse {
     let features = RelayFeatures {
         relay_version: "0.1.0".to_string(),
-        features: vec![RelayFeature {
-            name: "file_upload".to_string(),
-            version: "1".to_string(),
-        }],
+        features: vec![
+            RelayFeature {
+                name: "file_upload".to_string(),
+                version: "1".to_string(),
+            },
+            RelayFeature {
+                name: "push".to_string(),
+                version: "1".to_string(),
+            },
+        ],
     };
     (StatusCode::OK, Json(features)).into_response()
 }
@@ -140,6 +154,7 @@ struct AppState {
     pub relay: LocalRelay,
     pub cfg: AppConfig,
     pub file_store: Arc<dyn FileStoreApi>,
+    pub device_store: Arc<dyn DeviceStoreApi>,
     pub http_client: Arc<reqwest::Client>,
 }
 
@@ -165,6 +180,7 @@ impl AppState {
                 max_file_size_bytes: config.max_file_size_bytes,
             },
             file_store: store.clone(),
+            device_store: store,
             http_client,
         })
     }
