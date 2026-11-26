@@ -16,11 +16,16 @@ use std::{
     pin::Pin,
     sync::{Arc, Mutex},
 };
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::{
+    sync::{Semaphore, mpsc},
+    task::{JoinHandle, JoinSet},
+};
 use tracing::{error, info, warn};
 
 /// Jobs waiting for the worker; a full queue drops new jobs, which wallets recover by catch-up
 const QUEUE_CAPACITY: usize = 4096;
+/// Jobs sent at once
+const MAX_CONCURRENT_JOBS: usize = 32;
 /// Event ids remembered to keep one job per stored event
 const SEEN_CAPACITY: usize = 16_384;
 
@@ -122,32 +127,49 @@ impl PushQueue {
     }
 }
 
-/// Sends queued jobs until every queue handle is dropped; a job runs only once its event can be
-/// fetched from `database`
+/// Sends queued jobs until every queue handle is dropped, a few at a time so one slow or failing
+/// token does not hold up the others; a job runs only once its event can be fetched from `database`
 pub fn spawn_worker(
     mut jobs: mpsc::Receiver<PushJob>,
     database: Arc<dyn NostrDatabase>,
     sender: Arc<dyn PushSender>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
+        let slots = Arc::new(Semaphore::new(MAX_CONCURRENT_JOBS));
+        let mut running = JoinSet::new();
         while let Some(job) = jobs.recv().await {
-            let id = job.payload.event_id;
-            match database.event_by_id(&id).await {
-                Ok(Some(_)) => {}
-                Ok(None) => {
-                    warn!("Not pushing {id}: event is not stored");
-                    continue;
-                }
-                Err(e) => {
-                    error!("Not pushing {id}: event lookup failed: {e}");
-                    continue;
-                }
-            }
-            if let Err(e) = sender.send(&job.payload, &job.devices).await {
-                error!("Push for {id} failed: {e}");
-            }
+            let slot = slots
+                .clone()
+                .acquire_owned()
+                .await
+                .expect("semaphore is never closed");
+            let (database, sender) = (database.clone(), sender.clone());
+            running.spawn(async move {
+                send_job(job, database.as_ref(), sender.as_ref()).await;
+                drop(slot);
+            });
+            while running.try_join_next().is_some() {}
         }
+        while running.join_next().await.is_some() {}
     })
+}
+
+async fn send_job(job: PushJob, database: &dyn NostrDatabase, sender: &dyn PushSender) {
+    let id = job.payload.event_id;
+    match database.event_by_id(&id).await {
+        Ok(Some(_)) => {}
+        Ok(None) => {
+            warn!("Not pushing {id}: event is not stored");
+            return;
+        }
+        Err(e) => {
+            error!("Not pushing {id}: event lookup failed: {e}");
+            return;
+        }
+    }
+    if let Err(e) = sender.send(&job.payload, &job.devices).await {
+        error!("Push for {id} failed: {e}");
+    }
 }
 
 /// A database that queues a push once a gift wrap for a registered recipient is saved
@@ -538,5 +560,59 @@ mod tests {
         worker.await.unwrap();
 
         assert!(sender.sent.lock().unwrap().is_empty());
+    }
+
+    struct SlowFirstSender {
+        sent: Mutex<Vec<EventId>>,
+        first: Mutex<Option<EventId>>,
+    }
+
+    #[async_trait]
+    impl PushSender for SlowFirstSender {
+        async fn send(
+            &self,
+            payload: &PushPayload,
+            _devices: &[Device],
+        ) -> Result<(), anyhow::Error> {
+            let slow =
+                *self.first.lock().unwrap().get_or_insert(payload.event_id) == payload.event_id;
+            if slow {
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            }
+            self.sent.lock().unwrap().push(payload.event_id);
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn push_queue_slow_job_does_not_delay_the_next() {
+        let (queue, jobs) = PushQueue::new();
+        let inner: Arc<dyn NostrDatabase> = Arc::new(TestDatabase::default());
+        let sender = Arc::new(SlowFirstSender {
+            sent: Mutex::default(),
+            first: Mutex::default(),
+        });
+        let worker = spawn_worker(jobs, inner.clone(), sender.clone());
+        let recipient = Keys::generate().public_key();
+        let (slow, fast) = (
+            event(Kind::GiftWrap, &recipient),
+            event(Kind::GiftWrap, &recipient),
+        );
+        for wrap in [&slow, &fast] {
+            inner.save_event(wrap).await.unwrap();
+            queue.enqueue(PushJob {
+                payload: PushPayload {
+                    event_id: wrap.id,
+                    relay_url: "wss://relay.example.com".to_string(),
+                    kind: 1059,
+                },
+                devices: vec![],
+            });
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        assert_eq!(*sender.sent.lock().unwrap(), vec![fast.id]);
+        drop(queue);
+        worker.await.unwrap();
+        assert_eq!(sender.sent.lock().unwrap().len(), 2);
     }
 }

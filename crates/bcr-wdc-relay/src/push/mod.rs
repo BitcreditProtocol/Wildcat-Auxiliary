@@ -71,8 +71,12 @@ pub struct Device {
 
 /// The absolute URL NIP-98 auth events for device registration must name in their `u` tag
 pub fn push_url(host_url: &Url) -> Option<Url> {
+    if host_url.cannot_be_a_base() {
+        return None;
+    }
     let mut url = host_url.clone();
-    url.path_segments_mut().ok()?.pop_if_empty().push("push");
+    let path = format!("{}/push", url.path().trim_end_matches('/'));
+    url.set_path(&path);
     Some(url)
 }
 
@@ -121,8 +125,11 @@ async fn apply_device_request(
         Ok(request) => request,
         Err(e) => return (StatusCode::BAD_REQUEST, format!("Invalid body: {e}")).into_response(),
     };
-    if request.token.is_empty() || request.token.len() > MAX_TOKEN_LEN {
-        return (StatusCode::BAD_REQUEST, "Invalid token length").into_response();
+    if request.token.is_empty()
+        || request.token.len() > MAX_TOKEN_LEN
+        || request.token.contains('\0')
+    {
+        return (StatusCode::BAD_REQUEST, "Invalid token").into_response();
     }
     let device = Device {
         key,
@@ -249,6 +256,31 @@ mod tests {
             "https://relay.example.com/a/push"
         );
         assert_eq!(push_url(&slashed), push_url(&host));
+        for deep in [
+            "https://relay.example.com///",
+            "https://relay.example.com/a//",
+        ] {
+            let url = push_url(&Url::parse(deep).unwrap()).unwrap();
+            assert!(!url.path().contains("//"), "{url}");
+        }
+    }
+
+    #[tokio::test]
+    async fn push_device_rejects_nul_in_token() {
+        let store = MemoryDeviceStore::default();
+        let body = br#"{"platform":"android","token":"a\u0000b"}"#;
+        let headers = signed(
+            &Keys::generate(),
+            "PUT",
+            "https://relay.example.com/push",
+            body,
+            NOW,
+        );
+        assert_eq!(
+            send(&store, Method::PUT, &headers, body, NOW).await,
+            StatusCode::BAD_REQUEST
+        );
+        assert!(store.tokens().is_empty());
     }
 
     #[test]
