@@ -1,8 +1,10 @@
 use super::{Device, device_store::DeviceStoreApi};
+use crate::rate_limit::{PRUNE_INTERVAL, SlidingWindow};
 use async_trait::async_trait;
 use nostr::{
     event::{Event, EventId, Kind},
     filter::Filter,
+    key::PublicKey,
     types::Timestamp,
 };
 use nostr_database::{
@@ -10,7 +12,7 @@ use nostr_database::{
 };
 use serde::Serialize;
 use std::{
-    collections::{BTreeSet, HashSet, VecDeque},
+    collections::{BTreeSet, HashMap, HashSet, VecDeque},
     fmt,
     future::Future,
     pin::Pin,
@@ -22,16 +24,14 @@ use tokio::{
 };
 use tracing::{error, info, warn};
 
-/// Jobs waiting for the worker; a full queue drops new jobs, which wallets recover by catch-up
 const QUEUE_CAPACITY: usize = 4096;
-/// Jobs sent at once
 const MAX_CONCURRENT_JOBS: usize = 32;
-/// Event ids remembered to keep one job per stored event
 const SEEN_CAPACITY: usize = 16_384;
+const MAX_RECIPIENTS: usize = 16;
+const PUSHES_PER_MINUTE: usize = 30;
 
 type DbFuture<'a, T> = Pin<Box<dyn Future<Output = Result<T, DatabaseError>> + Send + 'a>>;
 
-/// What a push carries: only what a wallet needs to fetch the event from this relay
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct PushPayload {
     pub event_id: EventId,
@@ -39,20 +39,17 @@ pub struct PushPayload {
     pub kind: u16,
 }
 
-/// One push to deliver: the payload and the registered devices of the event's recipients
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PushJob {
     pub payload: PushPayload,
     pub devices: Vec<Device>,
 }
 
-/// Delivers a push to devices
 #[async_trait]
 pub trait PushSender: Send + Sync {
     async fn send(&self, payload: &PushPayload, devices: &[Device]) -> Result<(), anyhow::Error>;
 }
 
-/// Sender used while no push provider is configured
 pub struct LogSender;
 
 #[async_trait]
@@ -71,11 +68,24 @@ impl PushSender for LogSender {
 struct SeenIds {
     order: VecDeque<EventId>,
     ids: HashSet<EventId>,
+    rates: HashMap<PublicKey, SlidingWindow>,
+    pruned_at: Option<time::OffsetDateTime>,
 }
 
 impl SeenIds {
     fn contains(&self, id: &EventId) -> bool {
         self.ids.contains(id)
+    }
+
+    fn within_rate(&mut self, key: PublicKey, now: time::OffsetDateTime) -> bool {
+        if self.pruned_at.is_none_or(|at| now - at > PRUNE_INTERVAL) {
+            self.rates.retain(|_, window| window.retain(now));
+            self.pruned_at = Some(now);
+        }
+        self.rates
+            .entry(key)
+            .or_insert_with(|| SlidingWindow::new(PUSHES_PER_MINUTE, time::Duration::minutes(1)))
+            .allow(now)
     }
 
     fn insert(&mut self, id: EventId) {
@@ -90,7 +100,6 @@ impl SeenIds {
     }
 }
 
-/// Queue of push jobs with at most one job per event id
 #[derive(Debug, Clone)]
 pub struct PushQueue {
     tx: mpsc::Sender<PushJob>,
@@ -107,13 +116,23 @@ impl PushQueue {
         (queue, rx)
     }
 
-    /// Queues the job unless its event id was queued before; returns whether it was queued
-    pub fn enqueue(&self, job: PushJob) -> bool {
+    pub fn enqueue(&self, mut job: PushJob) -> bool {
         let mut seen = self.seen.lock().expect("push queue lock");
         if seen.contains(&job.payload.event_id) {
             return false;
         }
         let id = job.payload.event_id;
+        let now = time::OffsetDateTime::now_utc();
+        let keys: BTreeSet<PublicKey> = job.devices.iter().map(|d| d.key).collect();
+        let allowed: BTreeSet<PublicKey> = keys
+            .into_iter()
+            .filter(|key| seen.within_rate(*key, now))
+            .collect();
+        job.devices.retain(|d| allowed.contains(&d.key));
+        if job.devices.is_empty() {
+            warn!("Dropping push for {id}: recipient is over the push rate");
+            return false;
+        }
         match self.tx.try_send(job) {
             Ok(()) => {
                 seen.insert(id);
@@ -127,8 +146,6 @@ impl PushQueue {
     }
 }
 
-/// Sends queued jobs until every queue handle is dropped, a few at a time so one slow or failing
-/// token does not hold up the others; a job runs only once its event can be fetched from `database`
 pub fn spawn_worker(
     mut jobs: mpsc::Receiver<PushJob>,
     database: Arc<dyn NostrDatabase>,
@@ -172,7 +189,6 @@ async fn send_job(job: PushJob, database: &dyn NostrDatabase, sender: &dyn PushS
     }
 }
 
-/// A database that queues a push once a gift wrap for a registered recipient is saved
 pub struct PushingDatabase {
     inner: Arc<dyn NostrDatabase>,
     devices: Arc<dyn DeviceStoreApi>,
@@ -204,14 +220,15 @@ impl PushingDatabase {
     }
 
     async fn queue_push(&self, event: &Event) {
-        let mut devices = Vec::new();
         let recipients: BTreeSet<_> = event.tags.public_keys().collect();
-        for recipient in recipients {
-            match self.devices.devices_for(&recipient).await {
-                Ok(found) => devices.extend(found),
-                Err(e) => error!("Device lookup for {recipient} failed: {e}"),
+        let recipients: Vec<_> = recipients.into_iter().take(MAX_RECIPIENTS).collect();
+        let devices = match self.devices.devices_for(&recipients).await {
+            Ok(devices) => devices,
+            Err(e) => {
+                error!("Device lookup for {} failed: {e}", event.id);
+                return;
             }
-        }
+        };
         if devices.is_empty() {
             return;
         }
@@ -284,8 +301,6 @@ mod tests {
     };
     use std::collections::HashMap;
 
-    /// Stores events by id; `report_duplicates` mirrors the Postgres store, which rejects a
-    /// second save of one id
     #[derive(Debug, Default)]
     struct TestDatabase {
         events: Mutex<HashMap<EventId, Event>>,
@@ -349,7 +364,6 @@ mod tests {
         }
     }
 
-    /// Records each push and whether its event was fetchable from the database at that moment
     struct RecordingSender {
         database: Arc<dyn NostrDatabase>,
         sent: Mutex<Vec<(PushPayload, Vec<Device>, bool)>>,
@@ -418,7 +432,6 @@ mod tests {
             self.devices.upsert(&device).await.unwrap();
         }
 
-        /// Stops the queue and waits for the worker to send everything queued
         async fn drain(self) -> Vec<(PushPayload, Vec<Device>, bool)> {
             drop(self.database);
             self.worker.await.unwrap();
@@ -584,6 +597,52 @@ mod tests {
         }
     }
 
+    fn device(key: PublicKey) -> Device {
+        Device {
+            key,
+            platform: Platform::Android,
+            token: "token".to_string(),
+        }
+    }
+
+    #[tokio::test]
+    async fn push_queue_recipient_over_the_rate_is_not_pushed() {
+        let (queue, _jobs) = PushQueue::new();
+        let (flooded, quiet) = (Keys::generate().public_key(), Keys::generate().public_key());
+        let job = |key: PublicKey| PushJob {
+            payload: PushPayload {
+                event_id: event(Kind::GiftWrap, &key).id,
+                relay_url: "wss://relay.example.com".to_string(),
+                kind: 1059,
+            },
+            devices: vec![device(key)],
+        };
+        for _ in 0..PUSHES_PER_MINUTE {
+            assert!(queue.enqueue(job(flooded)));
+        }
+        assert!(!queue.enqueue(job(flooded)));
+        assert!(queue.enqueue(job(quiet)));
+    }
+
+    #[tokio::test]
+    async fn push_queue_looks_up_a_bounded_number_of_recipients() {
+        let setup = setup(true);
+        let keys: Vec<PublicKey> = (0..MAX_RECIPIENTS + 4)
+            .map(|_| Keys::generate().public_key())
+            .collect();
+        for key in &keys {
+            setup.register(*key, Platform::Android, "token").await;
+        }
+        let wrap = EventBuilder::new(Kind::GiftWrap, "")
+            .tags(keys.iter().map(|key| Tag::public_key(*key)))
+            .finalize(&Keys::generate())
+            .unwrap();
+        setup.database.save_event(&wrap).await.unwrap();
+        let sent = setup.drain().await;
+        assert_eq!(sent.len(), 1);
+        assert_eq!(sent[0].1.len(), MAX_RECIPIENTS);
+    }
+
     #[tokio::test]
     async fn push_queue_slow_job_does_not_delay_the_next() {
         let (queue, jobs) = PushQueue::new();
@@ -606,7 +665,7 @@ mod tests {
                     relay_url: "wss://relay.example.com".to_string(),
                     kind: 1059,
                 },
-                devices: vec![],
+                devices: vec![device(recipient)],
             });
         }
         tokio::time::sleep(std::time::Duration::from_millis(300)).await;

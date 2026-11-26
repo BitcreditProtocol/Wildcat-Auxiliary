@@ -32,6 +32,21 @@ impl PostgresStore {
             )
         "#;
         self.pool.get().await?.execute(qry, &[]).await?;
+
+        // Push submissions: the last FCM outcome per event and device, kept for 30 days
+        let qry = r#"
+            CREATE TABLE IF NOT EXISTS push_submissions (
+                event_id CHAR(64) NOT NULL,
+                pubkey CHAR(64) NOT NULL,
+                platform TEXT NOT NULL,
+                error TEXT,
+                submitted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                PRIMARY KEY (event_id, pubkey, platform)
+            )
+        "#;
+        self.pool.get().await?.execute(qry, &[]).await?;
+        let qry = "DELETE FROM push_submissions WHERE submitted_at < now() - interval '30 days'";
+        self.pool.get().await?.execute(qry, &[]).await?;
         Ok(())
     }
 }

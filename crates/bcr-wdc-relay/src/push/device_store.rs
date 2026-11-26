@@ -1,18 +1,19 @@
 use super::{Device, Platform};
 use crate::db::PostgresStore;
 use async_trait::async_trait;
-use nostr::key::PublicKey;
+use nostr::{event::EventId, key::PublicKey};
 
-/// Push device registrations: at most one token per key and platform
 #[async_trait]
 pub trait DeviceStoreApi: Send + Sync {
-    /// Stores the device's token for its key and platform, replacing any earlier token
     async fn upsert(&self, device: &Device) -> Result<(), anyhow::Error>;
-    /// Removes the registration of `key` and `platform` if it holds `token`; returns whether
-    /// one was removed
     async fn remove(&self, device: &Device) -> Result<bool, anyhow::Error>;
-    /// The registrations of `key`, one per platform at most
-    async fn devices_for(&self, key: &PublicKey) -> Result<Vec<Device>, anyhow::Error>;
+    async fn devices_for(&self, keys: &[PublicKey]) -> Result<Vec<Device>, anyhow::Error>;
+    async fn record_submission(
+        &self,
+        event_id: &EventId,
+        device: &Device,
+        error: Option<&str>,
+    ) -> Result<(), anyhow::Error>;
 }
 
 #[async_trait]
@@ -53,27 +54,54 @@ impl DeviceStoreApi for PostgresStore {
         Ok(removed > 0)
     }
 
-    async fn devices_for(&self, key: &PublicKey) -> Result<Vec<Device>, anyhow::Error> {
+    async fn devices_for(&self, keys: &[PublicKey]) -> Result<Vec<Device>, anyhow::Error> {
+        let keys: Vec<String> = keys.iter().map(PublicKey::to_hex).collect();
         let rows = self
             .pool
             .get()
             .await?
             .query(
-                "SELECT platform, token FROM push_devices WHERE pubkey = $1",
-                &[&key.to_hex()],
+                "SELECT pubkey, platform, token FROM push_devices WHERE pubkey = ANY($1)",
+                &[&keys],
             )
             .await?;
         Ok(rows
             .iter()
             .filter_map(|row| {
-                let platform: String = row.get(0);
+                let key: String = row.get(0);
+                let platform: String = row.get(1);
                 Some(Device {
-                    key: *key,
+                    key: PublicKey::from_hex(key.trim()).ok()?,
                     platform: Platform::parse(&platform)?,
-                    token: row.get(1),
+                    token: row.get(2),
                 })
             })
             .collect())
+    }
+
+    async fn record_submission(
+        &self,
+        event_id: &EventId,
+        device: &Device,
+        error: Option<&str>,
+    ) -> Result<(), anyhow::Error> {
+        self.pool
+            .get()
+            .await?
+            .execute(
+                "INSERT INTO push_submissions (event_id, pubkey, platform, error, submitted_at) \
+                 VALUES ($1, $2, $3, $4, now()) \
+                 ON CONFLICT (event_id, pubkey, platform) \
+                 DO UPDATE SET error = EXCLUDED.error, submitted_at = EXCLUDED.submitted_at",
+                &[
+                    &event_id.to_hex(),
+                    &device.key.to_hex(),
+                    &device.platform.as_str(),
+                    &error,
+                ],
+            )
+            .await?;
+        Ok(())
     }
 }
 
@@ -85,13 +113,17 @@ mod memory {
     use super::*;
     use std::{collections::HashMap, sync::Mutex};
 
-    /// Registrations keyed like the `push_devices` primary key
     #[derive(Default)]
     pub struct MemoryDeviceStore {
         devices: Mutex<HashMap<(PublicKey, Platform), String>>,
+        submissions: Mutex<Vec<(EventId, Device, Option<String>)>>,
     }
 
     impl MemoryDeviceStore {
+        pub fn submissions(&self) -> Vec<(EventId, Device, Option<String>)> {
+            self.submissions.lock().unwrap().clone()
+        }
+
         pub fn tokens(&self) -> Vec<(PublicKey, Platform, String)> {
             let devices = self.devices.lock().unwrap();
             devices
@@ -121,17 +153,31 @@ mod memory {
             Ok(false)
         }
 
-        async fn devices_for(&self, key: &PublicKey) -> Result<Vec<Device>, anyhow::Error> {
+        async fn devices_for(&self, keys: &[PublicKey]) -> Result<Vec<Device>, anyhow::Error> {
             let devices = self.devices.lock().unwrap();
             Ok(devices
                 .iter()
-                .filter(|((k, _), _)| k == key)
+                .filter(|((k, _), _)| keys.contains(k))
                 .map(|((k, platform), token)| Device {
                     key: *k,
                     platform: *platform,
                     token: token.clone(),
                 })
                 .collect())
+        }
+
+        async fn record_submission(
+            &self,
+            event_id: &EventId,
+            device: &Device,
+            error: Option<&str>,
+        ) -> Result<(), anyhow::Error> {
+            self.submissions.lock().unwrap().push((
+                *event_id,
+                device.clone(),
+                error.map(str::to_owned),
+            ));
+            Ok(())
         }
     }
 }

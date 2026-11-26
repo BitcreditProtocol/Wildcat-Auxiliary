@@ -126,12 +126,9 @@ fn authorization_header(headers: &axum::http::HeaderMap) -> Result<&str, AuthErr
         .ok_or(AuthError::BadAuthHeader)
 }
 
-/// Largest accepted base64 `Authorization` token of a NIP-98 request
 const MAX_HTTP_AUTH_TOKEN_LEN: usize = 16 * 1024;
-/// Largest accepted distance in seconds between a NIP-98 event's `created_at` and now
 pub const HTTP_AUTH_WINDOW_SECS: u64 = 60;
 
-/// Why a NIP-98 HTTP auth event does not authorize a request
 #[derive(Debug, PartialEq, Eq)]
 pub enum HttpAuthError {
     BadAuthHeader,
@@ -154,13 +151,6 @@ impl IntoResponse for HttpAuthError {
     }
 }
 
-/// Verifies a NIP-98 `Authorization: Nostr <base64 event>` header for one HTTP request and
-/// returns the key that signed it.
-///
-/// The event must be of kind 27235, its `u` tag must equal `url`, its `method` tag must equal
-/// `method`, its `created_at` must lie within [`HTTP_AUTH_WINDOW_SECS`] of `now` in either
-/// direction, its `payload` tag must be the hex SHA-256 of `body` whenever `body` is not empty,
-/// and its id and signature must verify. The token is accepted in standard or URL-safe base64.
 pub fn verify_http_auth(
     headers: &axum::http::HeaderMap,
     url: &nostr::types::Url,

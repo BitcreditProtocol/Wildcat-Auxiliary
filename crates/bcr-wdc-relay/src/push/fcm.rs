@@ -25,7 +25,6 @@ const BASE_BACKOFF: Duration = Duration::from_millis(500);
 const ALERT_TITLE: &str = "Bitcredit";
 const ALERT_BODY: &str = "You have a new message";
 
-/// Google service account credentials, as downloaded from the Firebase console
 #[derive(Clone, Deserialize)]
 pub struct ServiceAccount {
     pub project_id: String,
@@ -42,8 +41,6 @@ impl ServiceAccount {
     }
 }
 
-/// Credentials and access tokens are sent to these URLs, so they must use https; plain http to a
-/// loopback host is accepted only in tests.
 fn require_secure_url(raw: &str) -> Result<reqwest::Url, anyhow::Error> {
     let url = reqwest::Url::parse(raw).context("invalid url")?;
     match url.scheme() {
@@ -67,27 +64,22 @@ fn is_loopback(_: &reqwest::Url) -> bool {
     false
 }
 
-/// Why one FCM request failed
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SendError {
-    /// Worth retrying: rate limits, server errors, network errors, an expired access token
     Transient(String),
-    /// FCM says the registration token is dead
     InvalidToken(String),
-    /// Any other rejection; retrying will not help
     Rejected(String),
 }
 
-/// Posts one FCM v1 message
 #[async_trait]
 pub trait FcmClient: Send + Sync {
     async fn post(&self, message: &Value) -> Result<(), SendError>;
 }
 
-/// The FCM v1 request body for `device`
 pub fn build_message(payload: &PushPayload, device: &Device) -> Value {
     let data = json!({
         "event_id": payload.event_id.to_hex(),
+        "recipient": device.key.to_hex(),
         "relay_url": payload.relay_url,
         "kind": payload.kind.to_string(),
     });
@@ -115,7 +107,6 @@ pub fn build_message(payload: &PushPayload, device: &Device) -> Value {
     json!({ "message": message })
 }
 
-/// Maps an FCM error response to a [`SendError`]
 pub fn classify(status: u16, body: &str) -> SendError {
     let error = serde_json::from_str::<Value>(body)
         .ok()
@@ -180,7 +171,6 @@ struct AccessTokenResponse {
     expires_in: u64,
 }
 
-/// Talks to the FCM v1 HTTP API, authenticating with a service account
 pub struct HttpFcmClient {
     http: reqwest::Client,
     account: ServiceAccount,
@@ -294,7 +284,6 @@ impl FcmClient for HttpFcmClient {
     }
 }
 
-/// Sends pushes through FCM, retrying transient failures and dropping dead tokens
 pub struct FcmSender {
     client: Arc<dyn FcmClient>,
     devices: Arc<dyn DeviceStoreApi>,
@@ -342,7 +331,19 @@ impl PushSender for FcmSender {
     async fn send(&self, payload: &PushPayload, devices: &[Device]) -> Result<(), anyhow::Error> {
         let mut failures = Vec::new();
         for device in devices {
-            if let Err(e) = self.send_one(payload, device).await {
+            let error = self
+                .send_one(payload, device)
+                .await
+                .err()
+                .map(|e| e.to_string());
+            if let Err(e) = self
+                .devices
+                .record_submission(&payload.event_id, device, error.as_deref())
+                .await
+            {
+                warn!("Could not record push of {}: {e}", payload.event_id);
+            }
+            if let Some(e) = error {
                 failures.push(format!("{}: {e}", device.platform.as_str()));
             }
         }
@@ -413,13 +414,15 @@ mod tests {
 
     #[test]
     fn push_fcm_android_body_is_data_only_high_priority() {
-        let body = build_message(&payload(), &device(Platform::Android));
+        let device = device(Platform::Android);
+        let body = build_message(&payload(), &device);
         assert_eq!(
             body,
             json!({"message": {
                 "token": "tok",
                 "data": {
                     "event_id": test_id().to_hex(),
+                    "recipient": device.key.to_hex(),
                     "relay_url": "wss://relay.example",
                     "kind": "1059",
                 },
@@ -538,6 +541,10 @@ mod tests {
         let left = store.tokens();
         assert_eq!(left.len(), 1);
         assert_eq!(left[0].1, Platform::Android);
+        assert_eq!(
+            store.submissions(),
+            vec![(test_id(), dead, None), (test_id(), live, None)]
+        );
     }
 
     #[tokio::test]
@@ -547,8 +554,17 @@ mod tests {
         store.upsert(&d).await.unwrap();
         let client = ScriptedClient::new(vec![Err(SendError::Rejected("403".into()))]);
         let sender = sender(client.clone(), store.clone());
-        assert!(sender.send(&payload(), &[d]).await.is_err());
+        assert!(
+            sender
+                .send(&payload(), std::slice::from_ref(&d))
+                .await
+                .is_err()
+        );
         assert_eq!(client.posted.lock().unwrap().len(), 1);
         assert_eq!(store.tokens().len(), 1);
+        assert_eq!(
+            store.submissions(),
+            vec![(test_id(), d, Some("403".to_string()))]
+        );
     }
 }

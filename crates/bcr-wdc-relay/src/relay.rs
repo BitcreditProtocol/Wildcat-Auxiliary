@@ -94,7 +94,6 @@ async fn database(pool: Pool) -> Result<NostrPostgres> {
     Ok(NostrPostgres::from_pool(pool).await?)
 }
 
-/// The event database, queueing a push for every gift wrap saved for a registered recipient
 async fn push_database(
     config: &RelayConfig,
     pool: Pool,
@@ -106,9 +105,7 @@ async fn push_database(
         Some(path) => Arc::new(FcmSender::new(
             Arc::new(HttpFcmClient::new(
                 reqwest::Client::builder()
-                    .timeout(std::time::Duration::from_secs(
-                        config.mirror_timeout_seconds,
-                    ))
+                    .timeout(std::time::Duration::from_secs(config.fcm_timeout_seconds))
                     .build()?,
                 ServiceAccount::from_file(path)?,
                 &config.fcm_base_url,
@@ -169,6 +166,8 @@ pub struct RelayConfig {
     pub fcm_credentials_file: Option<std::path::PathBuf>,
     #[arg(default_value_t = String::from("https://fcm.googleapis.com"), long, env = "FCM_BASE_URL")]
     pub fcm_base_url: String,
+    #[arg(default_value_t = 10, long, env = "FCM_TIMEOUT_SECONDS")]
+    pub fcm_timeout_seconds: u64,
 }
 
 impl RelayConfig {

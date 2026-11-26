@@ -18,12 +18,9 @@ use tracing::{error, info};
 use crate::{AppState, auth::verify_http_auth};
 use device_store::DeviceStoreApi;
 
-/// Largest accepted `/push` request body
 pub const MAX_BODY_BYTES: usize = 8 * 1024;
-/// Largest accepted push token
 const MAX_TOKEN_LEN: usize = 4096;
 
-/// Platform a push token belongs to; a key holds at most one token per platform
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Platform {
@@ -48,12 +45,6 @@ impl Platform {
     }
 }
 
-/// Body of `PUT /push` and `DELETE /push`; the key is the signer of the NIP-98 auth event
-///
-/// # Example
-/// ```json
-/// {"platform": "android", "token": "fcm-registration-token"}
-/// ```
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct DeviceRequest {
@@ -61,7 +52,6 @@ pub struct DeviceRequest {
     pub token: String,
 }
 
-/// A push token registered for a key on one platform
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Device {
     pub key: PublicKey,
@@ -69,7 +59,6 @@ pub struct Device {
     pub token: String,
 }
 
-/// The absolute URL NIP-98 auth events for device registration must name in their `u` tag
 pub fn push_url(host_url: &Url) -> Option<Url> {
     if host_url.cannot_be_a_base() {
         return None;
@@ -80,8 +69,6 @@ pub fn push_url(host_url: &Url) -> Option<Url> {
     Some(url)
 }
 
-/// `PUT /push` registers or replaces the signer's token for a platform; `DELETE /push` removes
-/// it. Both answer 204, also when there was nothing to remove.
 pub async fn handle_device(
     State(state): State<AppState>,
     method: Method,
