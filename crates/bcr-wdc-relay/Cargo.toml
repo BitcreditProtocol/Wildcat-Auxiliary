@@ -13,6 +13,7 @@ bitcoin = { workspace = true, features = ["base64", "serde"] }
 clap = { version = "4.5.39", features = ["derive", "env"] }
 deadpool-postgres = "0.14"
 futures.workspace = true
+jsonwebtoken = "9"
 nostr = { git = "https://github.com/BitcreditProtocol/nostr.git", rev = "d60e3ebc77c7833db917c3030c145883b8f0ee62", features = ["os-rng"] }
 nostr-sdk = { git = "https://github.com/BitcreditProtocol/nostr.git", rev = "d60e3ebc77c7833db917c3030c145883b8f0ee62", features = ["local-relay"] }
 nostr-database = { git = "https://github.com/BitcreditProtocol/nostr.git", rev = "d60e3ebc77c7833db917c3030c145883b8f0ee62" }

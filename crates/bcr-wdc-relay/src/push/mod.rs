@@ -1,4 +1,5 @@
 pub mod device_store;
+pub mod fcm;
 pub mod queue;
 
 use axum::{
