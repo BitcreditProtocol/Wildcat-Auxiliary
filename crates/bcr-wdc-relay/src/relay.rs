@@ -112,7 +112,7 @@ async fn push_database(
                     .build()?,
                 ServiceAccount::from_file(path)?,
                 &config.fcm_base_url,
-            )),
+            )?),
             devices.clone(),
         )),
         None => Arc::new(LogSender),

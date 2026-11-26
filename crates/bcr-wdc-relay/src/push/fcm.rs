@@ -42,6 +42,22 @@ impl ServiceAccount {
     }
 }
 
+/// Credentials and access tokens are sent to these URLs, so they must use https; plain http is
+/// accepted only for a loopback host.
+fn require_secure_url(raw: &str) -> Result<(), anyhow::Error> {
+    let url = reqwest::Url::parse(raw).context("invalid url")?;
+    let host = url.host_str().unwrap_or("").trim_matches(['[', ']']);
+    let loopback = host == "localhost"
+        || host
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback());
+    match url.scheme() {
+        "https" => Ok(()),
+        "http" if loopback => Ok(()),
+        scheme => anyhow::bail!("{scheme} url {url} would send credentials unencrypted"),
+    }
+}
+
 /// Why one FCM request failed
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SendError {
@@ -164,18 +180,24 @@ pub struct HttpFcmClient {
 }
 
 impl HttpFcmClient {
-    pub fn new(http: reqwest::Client, account: ServiceAccount, base_url: &str) -> Self {
+    pub fn new(
+        http: reqwest::Client,
+        account: ServiceAccount,
+        base_url: &str,
+    ) -> Result<Self, anyhow::Error> {
+        require_secure_url(base_url).context("FCM base url")?;
+        require_secure_url(&account.token_uri).context("FCM token_uri")?;
         let send_url = format!(
             "{}/v1/projects/{}/messages:send",
             base_url.trim_end_matches('/'),
             account.project_id
         );
-        Self {
+        Ok(Self {
             http,
             account,
             send_url,
             token: Mutex::new(None),
-        }
+        })
     }
 
     async fn access_token(&self) -> Result<String, SendError> {
@@ -405,6 +427,26 @@ mod tests {
         assert!(message["apns"]["payload"]["aps"]["alert"]["body"].is_string());
         assert_eq!(message["data"]["kind"], "1059");
         assert!(message.get("android").is_none());
+    }
+
+    #[test]
+    fn push_fcm_credentials_go_only_to_https_or_loopback() {
+        for ok in [
+            "https://fcm.googleapis.com",
+            "http://localhost:8080",
+            "http://127.0.0.1:9",
+            "http://[::1]:9",
+        ] {
+            assert!(require_secure_url(ok).is_ok(), "{ok}");
+        }
+        for bad in [
+            "http://fcm.googleapis.com",
+            "http://oauth2.googleapis.com/token",
+            "ftp://localhost",
+            "not a url",
+        ] {
+            assert!(require_secure_url(bad).is_err(), "{bad}");
+        }
     }
 
     #[test]
