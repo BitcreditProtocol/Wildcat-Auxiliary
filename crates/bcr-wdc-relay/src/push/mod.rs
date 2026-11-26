@@ -1,4 +1,5 @@
 pub mod device_store;
+pub mod queue;
 
 use axum::{
     body::Bytes,
@@ -34,6 +35,14 @@ impl Platform {
         match self {
             Platform::Android => "android",
             Platform::Ios => "ios",
+        }
+    }
+
+    pub fn parse(name: &str) -> Option<Self> {
+        match name {
+            "android" => Some(Platform::Android),
+            "ios" => Some(Platform::Ios),
+            _ => None,
         }
     }
 }

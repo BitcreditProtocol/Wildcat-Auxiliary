@@ -1,6 +1,7 @@
-use super::Device;
+use super::{Device, Platform};
 use crate::db::PostgresStore;
 use async_trait::async_trait;
+use nostr::key::PublicKey;
 
 /// Push device registrations: at most one token per key and platform
 #[async_trait]
@@ -10,6 +11,8 @@ pub trait DeviceStoreApi: Send + Sync {
     /// Removes the registration of `key` and `platform` if it holds `token`; returns whether
     /// one was removed
     async fn remove(&self, device: &Device) -> Result<bool, anyhow::Error>;
+    /// The registrations of `key`, one per platform at most
+    async fn devices_for(&self, key: &PublicKey) -> Result<Vec<Device>, anyhow::Error>;
 }
 
 #[async_trait]
@@ -49,6 +52,29 @@ impl DeviceStoreApi for PostgresStore {
             .await?;
         Ok(removed > 0)
     }
+
+    async fn devices_for(&self, key: &PublicKey) -> Result<Vec<Device>, anyhow::Error> {
+        let rows = self
+            .pool
+            .get()
+            .await?
+            .query(
+                "SELECT platform, token FROM push_devices WHERE pubkey = $1",
+                &[&key.to_hex()],
+            )
+            .await?;
+        Ok(rows
+            .iter()
+            .filter_map(|row| {
+                let platform: String = row.get(0);
+                Some(Device {
+                    key: *key,
+                    platform: Platform::parse(&platform)?,
+                    token: row.get(1),
+                })
+            })
+            .collect())
+    }
 }
 
 #[cfg(test)]
@@ -57,8 +83,6 @@ pub use memory::MemoryDeviceStore;
 #[cfg(test)]
 mod memory {
     use super::*;
-    use crate::push::Platform;
-    use nostr::key::PublicKey;
     use std::{collections::HashMap, sync::Mutex};
 
     /// Registrations keyed like the `push_devices` primary key
@@ -95,6 +119,19 @@ mod memory {
                 return Ok(true);
             }
             Ok(false)
+        }
+
+        async fn devices_for(&self, key: &PublicKey) -> Result<Vec<Device>, anyhow::Error> {
+            let devices = self.devices.lock().unwrap();
+            Ok(devices
+                .iter()
+                .filter(|((k, _), _)| k == key)
+                .map(|((k, platform), token)| Device {
+                    key: *k,
+                    platform: *platform,
+                    token: token.clone(),
+                })
+                .collect())
         }
     }
 }

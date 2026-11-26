@@ -15,6 +15,7 @@ deadpool-postgres = "0.14"
 futures.workspace = true
 nostr = { git = "https://github.com/BitcreditProtocol/nostr.git", rev = "d60e3ebc77c7833db917c3030c145883b8f0ee62", features = ["os-rng"] }
 nostr-sdk = { git = "https://github.com/BitcreditProtocol/nostr.git", rev = "d60e3ebc77c7833db917c3030c145883b8f0ee62", features = ["local-relay"] }
+nostr-database = { git = "https://github.com/BitcreditProtocol/nostr.git", rev = "d60e3ebc77c7833db917c3030c145883b8f0ee62" }
 nostr-postgres-db = { git = "https://github.com/BitcreditProtocol/nostr-postgres-db.git", rev = "c58d1c922b3f791cb16c6e1767955d05972412ad" }
 reqwest = { workspace = true, features = ["stream", "rustls-tls"] }
 serde.workspace = true

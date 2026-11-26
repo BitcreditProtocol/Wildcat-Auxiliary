@@ -15,6 +15,7 @@ use nostr::{
     nips::nip73::{ExternalContentId, Nip73Tag},
     types::{RelayUrl, Url},
 };
+use nostr_database::NostrDatabase;
 use nostr_postgres_db::*;
 use nostr_sdk::local_relay::{
     LocalRelay, LocalRelayBuilder, LocalRelayBuilderNip42, WritePolicy, WritePolicyResult,
@@ -23,12 +24,20 @@ use time::Duration;
 use tokio::sync::Mutex;
 use tracing::info;
 
+use crate::push::{
+    device_store::DeviceStoreApi,
+    queue::{LogSender, PushQueue, PushingDatabase, spawn_worker},
+};
 use crate::rate_limit::{PRUNE_INTERVAL, SlidingWindow};
 
 const BCR_NOSTR_CHAIN_PREFIX: &str = "bitcredit";
 
-pub async fn init(config: &RelayConfig, pool: Pool) -> Result<LocalRelay> {
-    let relay = builder(config, pool).await?.build();
+pub async fn init(
+    config: &RelayConfig,
+    pool: Pool,
+    devices: Arc<dyn DeviceStoreApi>,
+) -> Result<LocalRelay> {
+    let relay = builder(config, pool, devices).await?.build();
     relay.run().await?;
 
     info!(
@@ -42,8 +51,12 @@ pub async fn init(config: &RelayConfig, pool: Pool) -> Result<LocalRelay> {
     Ok(relay)
 }
 
-async fn builder(config: &RelayConfig, pool: Pool) -> Result<LocalRelayBuilder> {
-    let dba = database(pool).await?;
+async fn builder(
+    config: &RelayConfig,
+    pool: Pool,
+    devices: Arc<dyn DeviceStoreApi>,
+) -> Result<LocalRelayBuilder> {
+    let dba = push_database(config, pool, devices).await?;
     Ok(LocalRelay::builder()
         .nip42(auth_mode(config))
         .database(dba)
@@ -78,6 +91,23 @@ fn block_rate_limiter(config: &RelayConfig) -> BlockRateLimiter<NostrRateLimiter
 
 async fn database(pool: Pool) -> Result<NostrPostgres> {
     Ok(NostrPostgres::from_pool(pool).await?)
+}
+
+/// The event database, queueing a push for every gift wrap saved for a registered recipient
+async fn push_database(
+    config: &RelayConfig,
+    pool: Pool,
+    devices: Arc<dyn DeviceStoreApi>,
+) -> Result<PushingDatabase> {
+    let inner: Arc<dyn NostrDatabase> = Arc::new(database(pool).await?);
+    let (queue, jobs) = PushQueue::new();
+    spawn_worker(jobs, inner.clone(), Arc::new(LogSender));
+    Ok(PushingDatabase::new(
+        inner,
+        devices,
+        queue,
+        config.relay_url.to_string(),
+    ))
 }
 
 #[derive(Debug, Clone, Parser)]

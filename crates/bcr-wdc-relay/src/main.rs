@@ -174,7 +174,7 @@ impl AppState {
         );
 
         Ok(Self {
-            relay: relay::init(config, pool).await?,
+            relay: relay::init(config, pool, store.clone()).await?,
             cfg: AppConfig {
                 host_url: config.host_url.clone(),
                 max_file_size_bytes: config.max_file_size_bytes,

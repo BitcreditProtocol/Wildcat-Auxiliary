@@ -954,6 +954,7 @@ dependencies = [
  "deadpool-postgres",
  "futures",
  "nostr 0.45.4",
+ "nostr-database 0.45.1",
  "nostr-postgres-db",
  "nostr-sdk 0.45.2",
  "reqwest 0.12.28",
