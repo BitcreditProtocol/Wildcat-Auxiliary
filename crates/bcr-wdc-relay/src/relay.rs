@@ -26,7 +26,8 @@ use tracing::info;
 
 use crate::push::{
     device_store::DeviceStoreApi,
-    queue::{LogSender, PushQueue, PushingDatabase, spawn_worker},
+    fcm::{FcmSender, HttpFcmClient, ServiceAccount},
+    queue::{LogSender, PushQueue, PushSender, PushingDatabase, spawn_worker},
 };
 use crate::rate_limit::{PRUNE_INTERVAL, SlidingWindow};
 
@@ -101,7 +102,22 @@ async fn push_database(
 ) -> Result<PushingDatabase> {
     let inner: Arc<dyn NostrDatabase> = Arc::new(database(pool).await?);
     let (queue, jobs) = PushQueue::new();
-    spawn_worker(jobs, inner.clone(), Arc::new(LogSender));
+    let sender: Arc<dyn PushSender> = match &config.fcm_credentials_file {
+        Some(path) => Arc::new(FcmSender::new(
+            Arc::new(HttpFcmClient::new(
+                reqwest::Client::builder()
+                    .timeout(std::time::Duration::from_secs(
+                        config.mirror_timeout_seconds,
+                    ))
+                    .build()?,
+                ServiceAccount::from_file(path)?,
+                &config.fcm_base_url,
+            )),
+            devices.clone(),
+        )),
+        None => Arc::new(LogSender),
+    };
+    spawn_worker(jobs, inner.clone(), sender);
     Ok(PushingDatabase::new(
         inner,
         devices,
@@ -149,6 +165,10 @@ pub struct RelayConfig {
     pub nostr_rate_limit_max_reqs: usize,
     #[arg(default_value_t = 60, long, env = "NOSTR_RATE_LIMIT_NOTES_PER_MINUTE")]
     pub nostr_rate_limit_notes_per_minute: u32,
+    #[arg(long, env = "FCM_CREDENTIALS_FILE")]
+    pub fcm_credentials_file: Option<std::path::PathBuf>,
+    #[arg(default_value_t = String::from("https://fcm.googleapis.com"), long, env = "FCM_BASE_URL")]
+    pub fcm_base_url: String,
 }
 
 impl RelayConfig {

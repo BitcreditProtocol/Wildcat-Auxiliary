@@ -953,6 +953,7 @@ dependencies = [
  "clap",
  "deadpool-postgres",
  "futures",
+ "jsonwebtoken",
  "nostr 0.45.4",
  "nostr-database 0.45.1",
  "nostr-postgres-db",
