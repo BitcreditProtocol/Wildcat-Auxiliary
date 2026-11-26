@@ -109,7 +109,7 @@ pub fn classify(status: u16, body: &str) -> SendError {
         .iter()
         .find_map(|d| d.get("errorCode").and_then(Value::as_str))
         .unwrap_or("");
-    if fcm_code == "UNREGISTERED" || status_name == "NOT_FOUND" || status == 404 {
+    if fcm_code == "UNREGISTERED" {
         return SendError::InvalidToken(summary);
     }
     if status_name == "INVALID_ARGUMENT" || fcm_code == "INVALID_ARGUMENT" {
@@ -405,6 +405,14 @@ mod tests {
         assert!(message["apns"]["payload"]["aps"]["alert"]["body"].is_string());
         assert_eq!(message["data"]["kind"], "1059");
         assert!(message.get("android").is_none());
+    }
+
+    #[test]
+    fn push_fcm_404_without_unregistered_code() {
+        let wrong_project = r#"{"error":{"code":404,"status":"NOT_FOUND","message":"Requested entity was not found."}}"#;
+        for body in [wrong_project, "{}", ""] {
+            assert!(matches!(classify(404, body), SendError::Rejected(_)));
+        }
     }
 
     #[test]
