@@ -107,6 +107,9 @@ async fn apply_device_request(
     body: &[u8],
     now: Timestamp,
 ) -> Response {
+    if body.len() > MAX_BODY_BYTES {
+        return StatusCode::PAYLOAD_TOO_LARGE.into_response();
+    }
     let url = match push_url(host_url) {
         Some(url) => url,
         None => {
@@ -519,6 +522,24 @@ mod tests {
                 StatusCode::BAD_REQUEST
             );
         }
+        assert!(store.tokens().is_empty());
+    }
+
+    #[tokio::test]
+    async fn push_device_rejects_body_over_the_limit_before_parsing() {
+        let store = MemoryDeviceStore::default();
+        let body = vec![b' '; MAX_BODY_BYTES + 1];
+        let headers = signed(
+            &Keys::generate(),
+            "PUT",
+            "https://relay.example.com/push",
+            &body,
+            NOW,
+        );
+        assert_eq!(
+            send(&store, Method::PUT, &headers, &body, NOW).await,
+            StatusCode::PAYLOAD_TOO_LARGE
+        );
         assert!(store.tokens().is_empty());
     }
 }

@@ -44,7 +44,7 @@ impl ServiceAccount {
 
 /// Credentials and access tokens are sent to these URLs, so they must use https; plain http is
 /// accepted only for a loopback host.
-fn require_secure_url(raw: &str) -> Result<(), anyhow::Error> {
+fn require_secure_url(raw: &str) -> Result<reqwest::Url, anyhow::Error> {
     let url = reqwest::Url::parse(raw).context("invalid url")?;
     let host = url.host_str().unwrap_or("").trim_matches(['[', ']']);
     let loopback = host == "localhost"
@@ -52,8 +52,8 @@ fn require_secure_url(raw: &str) -> Result<(), anyhow::Error> {
             .parse::<std::net::IpAddr>()
             .is_ok_and(|ip| ip.is_loopback());
     match url.scheme() {
-        "https" => Ok(()),
-        "http" if loopback => Ok(()),
+        "https" => Ok(url),
+        "http" if loopback => Ok(url),
         scheme => anyhow::bail!("{scheme} url {url} would send credentials unencrypted"),
     }
 }
@@ -175,7 +175,8 @@ struct AccessTokenResponse {
 pub struct HttpFcmClient {
     http: reqwest::Client,
     account: ServiceAccount,
-    send_url: String,
+    token_url: reqwest::Url,
+    send_url: reqwest::Url,
     token: Mutex<Option<(String, Instant)>>,
 }
 
@@ -185,16 +186,17 @@ impl HttpFcmClient {
         account: ServiceAccount,
         base_url: &str,
     ) -> Result<Self, anyhow::Error> {
-        require_secure_url(base_url).context("FCM base url")?;
-        require_secure_url(&account.token_uri).context("FCM token_uri")?;
-        let send_url = format!(
+        let token_url = require_secure_url(&account.token_uri).context("FCM token_uri")?;
+        let send_url = require_secure_url(&format!(
             "{}/v1/projects/{}/messages:send",
             base_url.trim_end_matches('/'),
             account.project_id
-        );
+        ))
+        .context("FCM base url")?;
         Ok(Self {
             http,
             account,
+            token_url,
             send_url,
             token: Mutex::new(None),
         })
@@ -233,7 +235,7 @@ impl HttpFcmClient {
             .map_err(|e| SendError::Rejected(format!("signing FCM assertion failed: {e}")))?;
         let response = self
             .http
-            .post(&self.account.token_uri)
+            .post(self.token_url.clone())
             .header("content-type", "application/x-www-form-urlencoded")
             .body(format!("grant_type={JWT_GRANT}&assertion={assertion}"))
             .send()
@@ -263,7 +265,7 @@ impl FcmClient for HttpFcmClient {
         let token = self.access_token().await?;
         let response = self
             .http
-            .post(&self.send_url)
+            .post(self.send_url.clone())
             .bearer_auth(token)
             .header("content-type", "application/json")
             .body(message.to_string())
