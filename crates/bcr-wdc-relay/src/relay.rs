@@ -15,6 +15,7 @@ use nostr::{
     nips::nip73::{ExternalContentId, Nip73Tag},
     types::{RelayUrl, Url},
 };
+use nostr_database::NostrDatabase;
 use nostr_postgres_db::*;
 use nostr_sdk::local_relay::{
     LocalRelay, LocalRelayBuilder, LocalRelayBuilderNip42, WritePolicy, WritePolicyResult,
@@ -23,12 +24,21 @@ use time::Duration;
 use tokio::sync::Mutex;
 use tracing::info;
 
+use crate::push::{
+    device_store::DeviceStoreApi,
+    fcm::{FcmSender, HttpFcmClient, ServiceAccount},
+    queue::{LogSender, PushQueue, PushSender, PushingDatabase, spawn_worker},
+};
 use crate::rate_limit::{PRUNE_INTERVAL, SlidingWindow};
 
 const BCR_NOSTR_CHAIN_PREFIX: &str = "bitcredit";
 
-pub async fn init(config: &RelayConfig, pool: Pool) -> Result<LocalRelay> {
-    let relay = builder(config, pool).await?.build();
+pub async fn init(
+    config: &RelayConfig,
+    pool: Pool,
+    devices: Arc<dyn DeviceStoreApi>,
+) -> Result<LocalRelay> {
+    let relay = builder(config, pool, devices).await?.build();
     relay.run().await?;
 
     info!(
@@ -42,8 +52,12 @@ pub async fn init(config: &RelayConfig, pool: Pool) -> Result<LocalRelay> {
     Ok(relay)
 }
 
-async fn builder(config: &RelayConfig, pool: Pool) -> Result<LocalRelayBuilder> {
-    let dba = database(pool).await?;
+async fn builder(
+    config: &RelayConfig,
+    pool: Pool,
+    devices: Arc<dyn DeviceStoreApi>,
+) -> Result<LocalRelayBuilder> {
+    let dba = push_database(config, pool, devices).await?;
     Ok(LocalRelay::builder()
         .nip42(auth_mode(config))
         .database(dba)
@@ -78,6 +92,35 @@ fn block_rate_limiter(config: &RelayConfig) -> BlockRateLimiter<NostrRateLimiter
 
 async fn database(pool: Pool) -> Result<NostrPostgres> {
     Ok(NostrPostgres::from_pool(pool).await?)
+}
+
+async fn push_database(
+    config: &RelayConfig,
+    pool: Pool,
+    devices: Arc<dyn DeviceStoreApi>,
+) -> Result<PushingDatabase> {
+    let inner: Arc<dyn NostrDatabase> = Arc::new(database(pool).await?);
+    let (queue, jobs) = PushQueue::new();
+    let sender: Arc<dyn PushSender> = match &config.fcm_credentials_file {
+        Some(path) => Arc::new(FcmSender::new(
+            Arc::new(HttpFcmClient::new(
+                reqwest::Client::builder()
+                    .timeout(std::time::Duration::from_secs(config.fcm_timeout_seconds))
+                    .build()?,
+                ServiceAccount::from_file(path)?,
+                &config.fcm_base_url,
+            )?),
+            devices.clone(),
+        )),
+        None => Arc::new(LogSender),
+    };
+    spawn_worker(jobs, inner.clone(), sender);
+    Ok(PushingDatabase::new(
+        inner,
+        devices,
+        queue,
+        config.relay_url.to_string(),
+    ))
 }
 
 #[derive(Debug, Clone, Parser)]
@@ -119,6 +162,12 @@ pub struct RelayConfig {
     pub nostr_rate_limit_max_reqs: usize,
     #[arg(default_value_t = 60, long, env = "NOSTR_RATE_LIMIT_NOTES_PER_MINUTE")]
     pub nostr_rate_limit_notes_per_minute: u32,
+    #[arg(long, env = "FCM_CREDENTIALS_FILE")]
+    pub fcm_credentials_file: Option<std::path::PathBuf>,
+    #[arg(default_value_t = String::from("https://fcm.googleapis.com"), long, env = "FCM_BASE_URL")]
+    pub fcm_base_url: String,
+    #[arg(default_value_t = 10, long, env = "FCM_TIMEOUT_SECONDS")]
+    pub fcm_timeout_seconds: u64,
 }
 
 impl RelayConfig {

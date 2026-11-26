@@ -563,6 +563,7 @@ mod tests {
                 max_file_size_bytes: 10_000_000, // 10MB
             },
             file_store: mock_store,
+            device_store: Arc::new(crate::push::device_store::MemoryDeviceStore::default()),
             http_client: Arc::new(reqwest::Client::new()),
         }
     }
