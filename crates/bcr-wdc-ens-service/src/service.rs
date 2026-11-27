@@ -194,8 +194,12 @@ impl Service {
         }
         // render the body once and send it to every recipient
         let subject = admin_notification_subject(&notification);
-        let body = build_admin_notification_body(notification, &self.cfg.wdc_dashboard_url)
-            .map_err(|e| Error::SendEmail(e.to_string()))?;
+        let body = build_admin_notification_body(
+            notification,
+            &self.cfg.mailjet_config.logo_url,
+            &self.cfg.wdc_dashboard_url,
+        )
+        .map_err(|e| Error::SendEmail(e.to_string()))?;
         let mut failures = 0;
         for recipient in recipients {
             let msg = EmailMessage {
